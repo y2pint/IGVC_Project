@@ -31,10 +31,10 @@ autovehworkspace/
 ```
 
 ### Submodules
-- **[isaac_ros_common](https://github.com/NVIDIA-ISAAC-ROS/isaac_ros_common)**  
+- **[isaac_ros_common](https://github.com/stargaze221/isaac_ros_common)**  
   Forked for environment setup, container build support, and integration with additional sensor drivers.
 
-- **[isaac_ros_nvblox](https://github.com/NVIDIA-ISAAC-ROS/isaac_ros_nvblox)**  
+- **[isaac_ros_nvblox](https://github.com/stargaze221/isaac_ros_nvblox)**  
   Forked for GPU-based 3D reconstruction and costmap generation for Nav2.
 
 To clone with submodules:
