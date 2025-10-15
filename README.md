@@ -11,7 +11,7 @@ Designed for **real-time navigation, mapping, and obstacle avoidance** using ste
 ```
  ┌────────────────────────────────────────────────────────┐
  │                    IGVC System Stack                   │
- ├────────────────────────────────────────────────────────┴
+ ├────────────────────────────────────────────────────────┤
  │  Sensors: ZED 2i (high) + RealSense D435 (low)         │
  │        │                                               │
  │        ▼                                               │
