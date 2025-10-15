@@ -44,7 +44,7 @@ Designed for **real-time navigation, mapping, and obstacle avoidance** using ste
 ## 🎥 Sensor Configuration
 
 ```
-     ↑  (Front of Vehicle)
+     ↑ 
      │
      │        [ ZED 2i Camera ]
      │          (High Mount)
@@ -52,7 +52,7 @@ Designed for **real-time navigation, mapping, and obstacle avoidance** using ste
      │        [ RealSense D435 ]
      │          (Low Mount)
      │
-     └────────────────────────────────────────────────────────→  Ground
+     └────────────────────────────────────────────────────────→  Ground (Forward)
 ```
 
 | Sensor | Purpose | ROS Topics |
