@@ -9,15 +9,15 @@ Designed for **real-time navigation, mapping, and obstacle avoidance** using ste
 ## 🧠 System Overview
 
 ```
- ┌────────────────────────────────────────────────────────────────────────┐
+ ┌────────────────────────────────────────────────────────┐
  │                    IGVC System Stack                   │
- ├────────────────────────────────────────────────────────────────────────┴
+ ├────────────────────────────────────────────────────────┴
  │  Sensors: ZED 2i (high) + RealSense D435 (low)         │
- │        │                                                │
- │        ▼                                                │
- │  Isaac ROS Image Pipeline → Isaac ROS Visual SLAM       │
+ │        │                                               │
+ │        ▼                                               │
+ │  Isaac ROS Image Pipeline → Isaac ROS Visual SLAM      │
  │        │                           │                   │
- │        └───────────────┬────────────────┤                   │
+ │        └───────────────┬───────────┤                   │
  │                       ▼                                │
  │                Isaac ROS NVBlox (3D Map)               │
  │                       │                                │
@@ -26,7 +26,7 @@ Designed for **real-time navigation, mapping, and obstacle avoidance** using ste
  │                       │                                │
  │                       ▼                                │
  │                Vehicle Control Commands                │
- └────────────────────────────────────────────────────────────────────────┘
+ └────────────────────────────────────────────────────────┘
 ```
 
 **Key Components**
