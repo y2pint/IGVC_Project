@@ -67,7 +67,7 @@ NVBlox fuses both depth streams into a unified 3D voxel and costmap representati
 ## 📦 Repository Structure
 
 ```
-autovehworkspace/
+igvc2025/
 │
 ├── isaac_ros_dev/
 │   ├── src/
