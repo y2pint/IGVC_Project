@@ -107,8 +107,23 @@ git submodule update --init --recursive
 | **Navigation** | Nav2 + MPPI controller |
 | **Sensors** | Intel RealSense D435 & ZED 2i |
 | **Optional** | NVBlox Costmap Layer for Nav2 |
-
 ---
+Refer to the following guides to complete your system setup:
+
+- [Isaac ROS Hardware Setup Guide](https://nvidia-isaac-ros.github.io/getting_started/hardware_setup/compute/index.html)  
+- [Jetson VPI Setup Guide](https://nvidia-isaac-ros.github.io/getting_started/hardware_setup/compute/jetson_vpi.html)  
+- [Development Environment Setup Guide](https://nvidia-isaac-ros.github.io/getting_started/dev_env_setup.html)
+
+During the development environment setup, add the following line to your `.bashrc` to define the Isaac ROS workspace path:
+
+```bash
+echo 'export ISAAC_ROS_WS=${HOME}/<this_repository_workspace>/isaac_ros-dev/' >> ~/.bashrc
+```
+
+It is also convenient to add an alias for quickly launching the development container:
+```bash
+echo "alias isaac_ros_run='cd \${ISAAC_ROS_WS}/src/isaac_ros_common && ./scripts/run_dev.sh -d \${ISAAC_ROS_WS}'" >> ~/.bashrc
+```
 
 ## ⚙️ Build & Run
 
