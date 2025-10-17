@@ -1,6 +1,7 @@
 [submodule "isaac_ros-dev/src/isaac_ros_common"]
 	path = isaac_ros-dev/src/isaac_ros_common
 	url = https://github.com/stargaze221/isaac_ros_common.git
+	branch = igvc
 [submodule "isaac_ros-dev/src/isaac_ros_nvblox"]
 	path = isaac_ros-dev/src/isaac_ros_nvblox
 	url = https://github.com/stargaze221/isaac_ros_nvblox.git

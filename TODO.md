@@ -1,0 +1,1 @@
+I need to finialize usbreset function. Look into the exsiting 1/8 rc car setting.
