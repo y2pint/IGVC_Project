@@ -3,6 +3,5 @@ isaac_ros-dev/install
 isaac_ros-dev/log
 isaac_ros-dev/isaac_ros_assets
 
-*.pyc
+*/__pycache__/*
 
-*/__pycache__
