@@ -2,7 +2,7 @@ bt_navigator:
   ros__parameters:
     use_sim_time: False
     global_frame: map
-    robot_base_frame: base_link #camera0_link
+    robot_base_frame: base_link 
     bt_loop_duration: 10
     default_server_timeout: 20
     navigators: ['navigate_to_pose', 'navigate_through_poses']
@@ -173,7 +173,7 @@ local_costmap:
       update_frequency: 5.0
       publish_frequency: 2.0
       global_frame: odom
-      robot_base_frame: base_link  # camera0_link
+      robot_base_frame: base_link
       rolling_window: true
       width: 6
       height: 6
@@ -308,7 +308,7 @@ behavior_server:
     assisted_teleop:
       plugin: "nav2_behaviors/AssistedTeleop"
     global_frame: odom
-    robot_base_frame: base_link # camera0_link
+    robot_base_frame: base_link
     transform_tolerance: 1.0
     use_sim_time: false
     simulate_ahead_time: 2.0
