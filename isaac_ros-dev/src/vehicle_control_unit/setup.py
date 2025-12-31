@@ -46,7 +46,9 @@ setup(
             'odom_relay_node = vehicle_control_unit.odom_relay_node:main',
             'manual_control_node = vehicle_control_unit.manual_control_node:main',
             'cmd_vel_node = vehicle_control_unit.cmd_vel_node:main',
-            
+
+            # NEW: RC (/mavros/rc/in) → /cmd_vel
+            'rc_to_cmd_vel = vehicle_control_unit.rc_to_cmd_vel:main',
 
         ],
     },

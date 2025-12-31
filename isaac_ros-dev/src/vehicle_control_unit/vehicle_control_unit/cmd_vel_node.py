@@ -1,146 +1,164 @@
 #!/usr/bin/env python3
+
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from std_msgs.msg import Int32, Bool
-from sensor_msgs.msg import BatteryState
 import math
 
-# === 차량 파라미터 ===
-WHEELBASE = 0.38
-STEERING_LEFT = 123
-STEERING_RIGHT = 55
-STEERING_CENTER = 95
-STEERING_K = 0.75
-K = 0.001109
-SCALE = 0.275
 
-class CmdVelToMotorNode(Node):
+class CmdVelToWheelRPM(Node):
     def __init__(self):
-        super().__init__('cmd_vel_to_motor')
+        super().__init__('cmd_vel_to_wheel_rpm')
 
-        # Publisher
-        self.rpm_pub = self.create_publisher(Int32, '/vesc_rpm_cmd', 10)
-        self.servo_pub = self.create_publisher(Int32, '/servo_cmd', 10)
+        # ------------------------------------------------------------
+        # Robot parameters (EDIT THESE ONCE)
+        # ------------------------------------------------------------
+        self.declare_parameter('wheel_radius', 0.075)   # meters
+        self.declare_parameter('track_width', 0.38)    # meters
+        self.declare_parameter('gear_ratio', 4.0)      # motor_rpm / wheel_rpm
+        self.declare_parameter('pole_pairs', 7)
+        self.declare_parameter('min_linear_velocity', 0.2)   # m/s
+        self.declare_parameter('min_angular_velocity', 0.05) # rad/s
+        
+        self.pole_pairs = self.get_parameter('pole_pairs').value
+        self.wheel_radius = self.get_parameter('wheel_radius').value
+        self.track_width = self.get_parameter('track_width').value
+        self.gear_ratio = self.get_parameter('gear_ratio').value
+        self.min_v = self.get_parameter('min_linear_velocity').value
+        self.min_omega = self.get_parameter('min_angular_velocity').value
 
+        # ------------------------------------------------------------
+        # Limits
+        # ------------------------------------------------------------
+        self.max_linear_accel =  0.5      # m/s^2
+        self.max_angular_accel = 0.1     # rad/s^2
+        self.dt = 0.05                   # 20 Hz control loop
+        self.min_erpm = 500              # deadzone clamp
+        self.max_erpm = 4000
+
+        # ------------------------------------------------------------
+        # Publishers
+        # ------------------------------------------------------------
+        self.left_rpm_pub = self.create_publisher(
+            Int32, '/vesc_left/rpm_cmd', 10
+        )
+        self.right_rpm_pub = self.create_publisher(
+            Int32, '/vesc_right/rpm_cmd', 10
+        )
+
+        # ------------------------------------------------------------
         # Subscribers
-        self.create_subscription(Twist, '/cmd_vel', self.cmd_vel_listener, 10)
-        self.create_subscription(Bool, '/stop_flag', self.stop_flag_callback, 10)
-        self.create_subscription(BatteryState, '/vesc_battery', self.battery_callback, 10)
-        self.create_subscription(Int32, '/vesc_rpm_cmd_man', self.man_rpm_callback, 10)
-        self.create_subscription(Int32, '/servo_cmd_man', self.man_servo_callback, 10)
+        # ------------------------------------------------------------
+        self.create_subscription(Twist, '/cmd_vel', self.cmd_vel_cb, 10)
+        self.create_subscription(Bool, '/stop_flag', self.stop_flag_cb, 10)
 
-        # States
-        self.stop_flag = False
+        # ------------------------------------------------------------
+        # State
+        # ------------------------------------------------------------
         self.latest_cmd_vel = Twist()
-        self.latest_voltage = None
+        self.stop_flag = False
 
         self.prev_v = 0.0
         self.prev_omega = 0.0
-        self.prev_pwm = STEERING_CENTER
 
-        # Manual Cmd States:
-        self.man_rpm = 0
-        self.man_servo = 90
+        # ------------------------------------------------------------
+        # Timer
+        # ------------------------------------------------------------
+        self.create_timer(self.dt, self.control_loop)
 
-        # Parameters
-        self.max_accel = 6
-        self.max_angular_accel = 3
-        self.max_pwm_rate = 300.0
-        self.dt = 0.001 # 주기 = 20Hz
-        self.min_erpm = 500
+        self.get_logger().info("✅ CmdVelToWheelRPM (diff drive) initialized")
 
-        self.loop_timer = self.create_timer(self.dt, self.control_loop)
-
-        self.get_logger().info("✅ CmdVelToMotorNode with battery voltage monitoring initialized.")
-
-    def man_rpm_callback(self, msg):
-        self.man_rpm = msg.data
-    
-    def man_servo_callback(self, msg):
-        self.man_servo = msg.data
-
-    def cmd_vel_listener(self, msg):
+    # ------------------------------------------------------------
+    # Callbacks
+    # ------------------------------------------------------------
+    def cmd_vel_cb(self, msg: Twist):
         self.latest_cmd_vel = msg
 
-    def battery_callback(self, msg: BatteryState):
-        self.latest_voltage = msg.voltage
-        self.get_logger().info(f"🔋 VESC Battery Voltage: {self.latest_voltage:.2f} V")
+    def stop_flag_cb(self, msg: Bool):
+        self.stop_flag = msg.data
+        if self.stop_flag:
+            self.get_logger().warn("🛑 stop_flag asserted")
 
+    # ------------------------------------------------------------
+    # Control loop
+    # ------------------------------------------------------------
     def control_loop(self):
         if self.stop_flag:
-            self.get_logger().warn("🛑 STOP due to stop_flag → Sending 0 commands")
-            self.rpm_pub.publish(Int32(data=self.man_rpm))
-            self.servo_pub.publish(Int32(data=self.man_servo))
+            self.publish_rpm(0, 0)
             return
 
-        # === 속도 및 조향 계산 ===
+        # Desired velocities
         target_v = self.latest_cmd_vel.linear.x
         target_omega = self.latest_cmd_vel.angular.z
 
-        delta_v = target_v - self.prev_v
-        max_delta_v = self.max_accel * self.dt
-        if abs(delta_v) > max_delta_v:
-            delta_v = math.copysign(max_delta_v, delta_v)
-        v = self.prev_v + delta_v
+        # ---- Linear accel limiting ----
+        dv = target_v - self.prev_v
+        max_dv = self.max_linear_accel * self.dt
+        dv = max(min(dv, max_dv), -max_dv)
+        v = self.prev_v + dv
         self.prev_v = v
 
-        delta_omega = target_omega - self.prev_omega
-        max_delta_omega = self.max_angular_accel * self.dt
-        if abs(delta_omega) > max_delta_omega:
-            delta_omega = math.copysign(max_delta_omega, delta_omega)
-        omega = self.prev_omega + delta_omega
+        # ---- Angular accel limiting ----
+        domega = target_omega - self.prev_omega
+        max_domega = self.max_angular_accel * self.dt
+        domega = max(min(domega, max_domega), -max_domega)
+        omega = self.prev_omega + domega
         self.prev_omega = omega
 
-        # === 선속도 → eRPM 변환 ===
-        if v == 0.0:
-            erpm = 0
-        else:
-            erpm = int(v / (K * SCALE))
-            # Clamp to minimum absolute value if not zero
-            if abs(erpm) < 500:
-                erpm = int(math.copysign(500, erpm))
+        # ------------------------------------------------------------
+        # Enforce minimum controllable velocities (EXPLICIT)
+        # ------------------------------------------------------------
+        if 0.0 < abs(v) < self.min_v:
+            v = math.copysign(self.min_v, v)
 
-        erpm = max(min(erpm, 10000), -10000)
+        if 0.0 < abs(omega) < self.min_omega:
+            omega = math.copysign(self.min_omega, omega)
 
+        # ------------------------------------------------------------
+        # Differential drive kinematics
+        # ------------------------------------------------------------
+        v_left = v - omega * (self.track_width / 2.0)
+        v_right = v + omega * (self.track_width / 2.0)
 
-        # === 조향각 → PWM 변환 ===
-        if omega == 0 or v == 0:
-            steering_deg = 0.0
-        else:
-            turning_radius = v / omega
-            steering_angle_rad = math.atan(WHEELBASE / turning_radius)
-            steering_deg = math.degrees(steering_angle_rad) / STEERING_K
+        left_erpm = self.linear_to_erpm(v_left)
+        right_erpm = self.linear_to_erpm(v_right)
 
-        target_pwm = self.angle_to_pwm(steering_deg)
+        self.publish_rpm(left_erpm, right_erpm)
 
-        # === PWM 변화 제한 없이 즉시 반영 === 🔸 NEW
-        steering_pwm = target_pwm
-        self.prev_pwm = steering_pwm
+    # ------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------
+    def linear_to_erpm(self, v):
+        if abs(v) < 1e-3:
+            return 0
 
-        # === 퍼블리시 ===
-        self.rpm_pub.publish(Int32(data=erpm))
-        self.servo_pub.publish(Int32(data=steering_pwm))
-        self.get_logger().info(f"Published eRPM: {erpm}, PWM: {steering_pwm}")
+        wheel_rps = v / (2.0 * math.pi * self.wheel_radius)
+        wheel_rpm = wheel_rps * 60.0
 
-    
+        motor_rpm = wheel_rpm * self.gear_ratio
+        erpm = motor_rpm * self.pole_pairs
 
-    def angle_to_pwm(self, angle_deg):
-        normalized = angle_deg / 30.0
-        normalized = max(min(normalized, 1.0), -1.0)
-        pwm = round(STEERING_CENTER + normalized * (STEERING_LEFT - STEERING_CENTER))
-        return max(min(pwm, STEERING_LEFT), STEERING_RIGHT)
+        erpm = int(erpm)
 
-    def stop_flag_callback(self, msg: Bool):
-        self.stop_flag = msg.data
-        self.get_logger().info(f"🛑 stop_flag updated: {self.stop_flag}")
+        # Deadzone clamp
+        if 0 < abs(erpm) < self.min_erpm:
+            erpm = int(math.copysign(self.min_erpm, erpm))
+
+        return max(min(erpm, self.max_erpm), -self.max_erpm)
+
+    def publish_rpm(self, left, right):
+        self.left_rpm_pub.publish(Int32(data=left))
+        self.right_rpm_pub.publish(Int32(data=right))
+
 
 def main(args=None):
     rclpy.init(args=args)
-    node = CmdVelToMotorNode()
+    node = CmdVelToWheelRPM()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()
