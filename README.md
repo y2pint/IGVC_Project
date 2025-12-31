@@ -1,7 +1,7 @@
 # 🏆️ IGVC Project
 
 Autonomous ground vehicle platform for the **Intelligent Ground Vehicle Competition (IGVC)**.  
-This project integrates NVIDIA’s **Isaac ROS** ecosystem for perception, mapping, and navigation with **Nav2** and the **MPPI controller**.  
+This project integrates NVIDIA’s **Isaac ROS**  [(release-3.2)](https://nvidia-isaac-ros.github.io/v/release-3.2/getting_started)  ecosystem for perception, mapping, and navigation with **Nav2** and the **MPPI controller**.  
 Designed for **real-time navigation, mapping, and obstacle avoidance** using stereo vision and GPU-accelerated processing on **Jetson AGX Orin**.
 
 ---
@@ -85,14 +85,54 @@ igvc2025/
 │   └── README.md
 ```
 
-To clone with submodules:
+### 🧩 Clone the repository (with submodules and Git LFS)
+
+If you don’t have Git LFS installed yet:
+
+```bash
+sudo apt-get install git-lfs
+git lfs install --skip-repo
+```
+
+Then clone the repository **with all submodules**:
+
 ```bash
 git clone --recurse-submodules https://github.com/<your-org>/igvc_project.git
+cd igvc_project
+git lfs pull
 ```
-If already cloned:
+
+---
+
+### 🧩 If the repository is already cloned
+
+If you cloned it earlier without submodules:
+
 ```bash
+cd igvc_project
 git submodule update --init --recursive
+git lfs install
+git lfs pull
 ```
+
+*(This ensures both submodules and any LFS-tracked files are properly fetched.)*
+
+---
+
+### ✅ Optional (recommended)
+
+To make sure **future submodule updates also pull LFS files automatically**, you can set:
+
+```bash
+git config --global submodule.recurse true
+git config --global lfs.fetchinclude '*'
+```
+
+---
+
+Would you like me to make this version formatted for a `README.md` (with headings, code blocks, and concise descriptions)?
+
+
 
 ---
 
@@ -113,9 +153,9 @@ git submodule update --init --recursive
 
 Refer to the following guides to complete your system setup:
 
-* [Isaac ROS Hardware Setup Guide](https://nvidia-isaac-ros.github.io/getting_started/hardware_setup/compute/index.html)
-* [Jetson VPI Setup Guide](https://nvidia-isaac-ros.github.io/getting_started/hardware_setup/compute/jetson_vpi.html)
-* [Development Environment Setup Guide](https://nvidia-isaac-ros.github.io/getting_started/dev_env_setup.html)
+* [Isaac ROS Hardware Setup Guide](https://nvidia-isaac-ros.github.io/v/release-3.2/getting_started/hardware_setup/compute/index.html)
+* [Jetson VPI Setup Guide](https://nvidia-isaac-ros.github.io/v/release-3.2/getting_started/hardware_setup/compute/jetson_vpi.html)
+* [Development Environment Setup Guide](https://nvidia-isaac-ros.github.io/v/release-3.2/getting_started/dev_env_setup.html)
 
 During the development environment setup, add the following line to your `.bashrc` file to define the Isaac ROS workspace path:
 
@@ -135,7 +175,7 @@ After modifying `.bashrc`, reload it:
 source ~/.bashrc
 ```
 
-Finally, set up your sensors by following the [Isaac ROS Sensor Setup Guide](https://nvidia-isaac-ros.github.io/getting_started/hardware_setup/sensors/index.html).
+Finally, set up your sensors by following the [Isaac ROS Sensor Setup Guide](https://nvidia-isaac-ros.github.io/v/release-3.2/getting_started/hardware_setup/sensors/index.html).
 
 
 

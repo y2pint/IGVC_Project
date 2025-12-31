@@ -112,15 +112,20 @@ def generate_launch_description() -> LaunchDescription:
         )
     )
 
+
     # Odometry relay
     actions.append(
         Node(
             package='vehicle_control_unit',
             executable='odom_relay_node',
             name='odom_relay_node',
-            output='screen'
+            output='screen',
+            parameters=[{
+                'input_topic': '/visual_slam/tracking/odometry'  # or '/zed/zed_node/odom'
+            }]
         )
     )
+
 
     # Static TF base_link ↔ camera0_link
     actions.append(

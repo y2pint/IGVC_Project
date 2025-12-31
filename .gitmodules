@@ -5,3 +5,7 @@
 [submodule "isaac_ros-dev/src/isaac_ros_nvblox"]
 	path = isaac_ros-dev/src/isaac_ros_nvblox
 	url = https://github.com/stargaze221/isaac_ros_nvblox.git
+[submodule "isaac_ros-dev/src/zed-ros2-wrapper"]
+	path = isaac_ros-dev/src/zed-ros2-wrapper
+	url = https://github.com/stereolabs/zed-ros2-wrapper.git
+	branch = humble-v4.2.5
