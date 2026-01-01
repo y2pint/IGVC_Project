@@ -35,45 +35,20 @@ def generate_launch_description():
             output='screen'
         ),
 
-        # ------------------------------------------------------------
-        # Left VESC
-        # ------------------------------------------------------------
         Node(
-            package='vehicle_control_unit',
-            executable='vesc_bridge_node',
-            name='vesc_left',
-            parameters=[{
-                'vesc_port': '/host_dev/vesc_left',
-                'reverse': False,
-                'cmd_timeout': 0.2,
-                'use_kickstart': False
-            }],
-            remappings=[
-                ('vesc_rpm_cmd', 'vesc_left/rpm_cmd'),
-                ('vesc_battery', 'vesc_left/vesc_battery'),
-            ],
-            output='screen'
+        package='vehicle_control_unit',
+        executable='vesc_can_node',
+        name='left_vesc',
+        parameters=[{'vesc_id': 70}, {'vesc_name': 'left_vesc'}]
         ),
 
-        # ------------------------------------------------------------
-        # Right VESC
-        # ------------------------------------------------------------
         Node(
-            package='vehicle_control_unit',
-            executable='vesc_bridge_node',
-            name='vesc_right',
-            parameters=[{
-                'vesc_port': '/host_dev/vesc_right',
-                'reverse': False,
-                'cmd_timeout': 0.2,
-                'use_kickstart': False
-            }],
-            remappings=[
-                ('vesc_rpm_cmd', 'vesc_right/rpm_cmd'),
-                ('vesc_battery', 'vesc_right/vesc_battery'),
-            ],
-            output='screen'
+        package='vehicle_control_unit',
+        executable='vesc_can_node',
+        name='right_vesc',
+        parameters=[{'vesc_id': 8}, {'vesc_name': 'right_vesc'}]
         ),
+
 
         # ------------------------------------------------------------
         # /cmd_vel → wheel RPM (diff drive)

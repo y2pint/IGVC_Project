@@ -20,7 +20,7 @@ class RCToCmdVel(Node):
 
         self.declare_parameter('pwm_center', 1500)
         self.declare_parameter('pwm_range', 500)
-        self.declare_parameter('deadzone', 100)
+        self.declare_parameter('deadzone', 50)
 
         self.declare_parameter('max_linear_vel', 1.0)   # m/s
         self.declare_parameter('max_angular_vel', 1.0)  # rad/s
@@ -81,7 +81,7 @@ class RCToCmdVel(Node):
 
         # Scale to physical units
         cmd.linear.x = lin_norm * self.max_v
-        cmd.angular.z = ang_norm * self.max_omega
+        cmd.angular.z = -ang_norm * self.max_omega
 
         self.cmd_vel_pub.publish(cmd)
 

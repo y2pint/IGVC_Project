@@ -31,20 +31,20 @@ class CmdVelToWheelRPM(Node):
         # ------------------------------------------------------------
         # Limits
         # ------------------------------------------------------------
-        self.max_linear_accel =  0.5      # m/s^2
-        self.max_angular_accel = 0.1     # rad/s^2
-        self.dt = 0.05                   # 20 Hz control loop
-        self.min_erpm = 500              # deadzone clamp
+        self.max_linear_accel =  2.0      # m/s^2
+        self.max_angular_accel = 2.0     # rad/s^2
+        self.dt = 0.02                   # 20 Hz control loop
+        self.min_erpm = 300              # deadzone clamp
         self.max_erpm = 4000
 
         # ------------------------------------------------------------
         # Publishers
         # ------------------------------------------------------------
         self.left_rpm_pub = self.create_publisher(
-            Int32, '/vesc_left/rpm_cmd', 10
+            Int32, '/left_vesc/cmd_rpm', 10
         )
         self.right_rpm_pub = self.create_publisher(
-            Int32, '/vesc_right/rpm_cmd', 10
+            Int32, '/right_vesc/cmd_rpm', 10
         )
 
         # ------------------------------------------------------------

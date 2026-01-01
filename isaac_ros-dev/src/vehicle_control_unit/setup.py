@@ -50,6 +50,9 @@ setup(
             # NEW: RC (/mavros/rc/in) → /cmd_vel
             'rc_to_cmd_vel = vehicle_control_unit.rc_to_cmd_vel:main',
 
+            # NEW: VESC Can
+            'vesc_can_node = vehicle_control_unit.vesc_can_node:main',
+
         ],
     },
 )

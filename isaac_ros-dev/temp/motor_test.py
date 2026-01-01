@@ -2,7 +2,7 @@ from pyvesc import VESC
 import time
 import sys
 
-VESC_PORT = '/host_dev/vesc_right'
+VESC_PORT = '/host_dev/vesc_left'
 TARGET_RPM = 1000
 
 MAX_INIT_RETRIES = 5

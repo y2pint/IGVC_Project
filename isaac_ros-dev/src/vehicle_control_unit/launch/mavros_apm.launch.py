@@ -15,7 +15,7 @@ def generate_launch_description():
             ])
         ),
         launch_arguments={
-            'fcu_url': 'serial:///host_dev/pixhawk:57600',
+            'fcu_url': 'serial:///dev/pixhawk:57600',
             'time_sync': 'false'
         }.items()
     )
@@ -61,15 +61,15 @@ def generate_launch_description():
             actions=[set_rc_rate]
         ),
         
-        # Wait 5 seconds to set GPS message interval
-        TimerAction(
-            period=5.0,
-            actions=[set_gps_rate]
-        ),
+        # # Wait 5 seconds to set GPS message interval
+        # TimerAction(
+        #     period=5.0,
+        #     actions=[set_gps_rate]
+        # ),
         
-        # Set IMU message interval
-        TimerAction(
-            period=5.0,
-            actions=[set_imu_rate]
-        ),
+        # # Set IMU message interval
+        # TimerAction(
+        #     period=5.0,
+        #     actions=[set_imu_rate]
+        # ),
     ])
