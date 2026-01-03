@@ -6,6 +6,6 @@
     path = isaac_ros-dev/src/isaac_ros_nvblox
     url = https://github.com/stargaze221/isaac_ros_nvblox.git
     branch = frozen/nvblox-isaac-3.2-update5
-[submodule "isaac_ros_dev/src/zed-ros2-wrapper"]
-	path = isaac_ros_dev/src/zed-ros2-wrapper
+[submodule "isaac_ros-dev/src/zed-ros2-wrapper"]
+	path = isaac_ros-dev/src/zed-ros2-wrapper
 	url = https://github.com/stereolabs/zed-ros2-wrapper.git
