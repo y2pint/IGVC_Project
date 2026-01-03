@@ -85,7 +85,11 @@ igvc2025/
 │   └── README.md
 ```
 
-### 🧩 Clone the repository (with submodules and Git LFS)
+Sure — here’s a **clean, updated README section** that reflects the changes we made (Git LFS, submodules, and the new fast-launch / no-remote-check workflow). It is formatted and ready to paste into `README.md`.
+
+---
+
+## 🧩 Clone the repository (with submodules and Git LFS)
 
 If you don’t have Git LFS installed yet:
 
@@ -94,7 +98,7 @@ sudo apt-get install git-lfs
 git lfs install --skip-repo
 ```
 
-Then clone the repository **with all submodules**:
+Then clone the repository **with all submodules and LFS assets**:
 
 ```bash
 git clone --recurse-submodules https://github.com/<your-org>/igvc_project.git
@@ -104,9 +108,9 @@ git lfs pull
 
 ---
 
-### 🧩 If the repository is already cloned
+## 🧩 If the repository is already cloned
 
-If you cloned it earlier without submodules:
+If you cloned earlier without submodules or LFS files:
 
 ```bash
 cd igvc_project
@@ -115,13 +119,13 @@ git lfs install
 git lfs pull
 ```
 
-*(This ensures both submodules and any LFS-tracked files are properly fetched.)*
+This ensures both **submodules and LFS-tracked files** are fully synchronized.
 
 ---
 
-### ✅ Optional (recommended)
+## ⚙️ Recommended Git settings (optional)
 
-To make sure **future submodule updates also pull LFS files automatically**, you can set:
+Enable automatic submodule recursion and LFS fetch:
 
 ```bash
 git config --global submodule.recurse true
@@ -130,11 +134,39 @@ git config --global lfs.fetchinclude '*'
 
 ---
 
-Would you like me to make this version formatted for a `README.md` (with headings, code blocks, and concise descriptions)?
+## 🚀 Running the Isaac ROS Dev Container (fast launch)
 
+By default, the Isaac ROS launcher checks remote Docker registries when building images.
+If you already have the images locally (Jetson/offline workflow), you can **skip remote checks and image rebuilds**:
 
+```bash
+export SKIP_DOCKER_BUILD=1        # reuse existing image
+export ISAAC_ROS_DISABLE_REMOTE_CHECK=1   # skip registry lookup
+igvc_ros_run
+```
+
+Or use the CLI flag:
+
+```bash
+igvc_ros_run --skip_image_build
+```
+
+This makes container startup **much faster** and avoids network delays.
+
+> If you ever want to force-rebuild images, simply omit these flags.
 
 ---
+
+## 🧪 Verify the environment
+
+Inside the container:
+
+```bash
+ros2 doctor
+nvblox_test_node   # or run any example launch
+```
+
+
 
 ## 🧠 Dependencies
 
