@@ -31,6 +31,26 @@ The system is designed for **GPU-accelerated stereo vision, 3D mapping, and reac
 ```
 
 ---
+## 🎥 Sensor Configuration
+
+```
+     ↑
+     │        [ ZED 2i ]
+     │          (High Mount)
+     │
+     │        [ RealSense D435 ]
+     │          (Low Mount)
+     │
+     └────────────────────────────→ Forward
+```
+
+| Sensor             | Purpose                               |
+| ------------------ | ------------------------------------- |
+| **ZED 2i**         | Long-range stereo depth, mapping, VIO |
+| **RealSense D435** | Short-range RGB-D obstacle detection  |
+
+Depth data from both sensors is fused by **NVBlox** into a unified voxel map and costmap for Nav2.
+---
 
 ## 📦 Repository Structure (Actual)
 
@@ -67,25 +87,13 @@ igvc2025/
 
 ---
 
-## 🎥 Sensor Configuration
+## ⚙️ System Setup
 
-```
-     ↑
-     │        [ ZED 2i ]
-     │          (High Mount)
-     │
-     │        [ RealSense D435 ]
-     │          (Low Mount)
-     │
-     └────────────────────────────→ Forward
-```
+Refer to official Isaac ROS documentation:
 
-| Sensor             | Purpose                               |
-| ------------------ | ------------------------------------- |
-| **ZED 2i**         | Long-range stereo depth, mapping, VIO |
-| **RealSense D435** | Short-range RGB-D obstacle detection  |
-
-Depth data from both sensors is fused by **NVBlox** into a unified voxel map and costmap for Nav2.
+* Isaac ROS Hardware Setup
+* Jetson VPI Setup
+* Development Environment Setup
 
 ---
 
@@ -101,7 +109,7 @@ git lfs install --skip-repo
 ### Clone with submodules
 
 ```bash
-git clone --recurse-submodules https://github.com/<your-org>/igvc2025.git
+git clone --recurse-submodules https://github.com/LCAS-Lab/TnTechIGVC2026.git
 cd igvc2025
 git lfs pull
 ```
@@ -125,6 +133,20 @@ git lfs pull
 git config --global submodule.recurse true
 git config --global lfs.fetchinclude '*'
 ```
+
+## Set the workspace path:
+
+```bash
+echo 'export ISAAC_ROS_WS=${HOME}/TnTechIGVC2026/isaac_ros-dev' >> ~/.bashrc
+```
+
+## Add a convenience alias:
+
+```bash
+echo "alias igvc_ros_run='cd \${ISAAC_ROS_WS}/src/isaac_ros_common && ./scripts/run_dev.sh -d \${ISAAC_ROS_WS}'" >> ~/.bashrc
+source ~/.bashrc
+```
+
 
 ---
 
@@ -169,28 +191,6 @@ ros2 pkg list | grep nvblox
 | Navigation | Nav2 + MPPI            |
 | Sensors    | ZED 2i, RealSense D435 |
 
----
-
-## ⚙️ System Setup
-
-Refer to official Isaac ROS documentation:
-
-* Isaac ROS Hardware Setup
-* Jetson VPI Setup
-* Development Environment Setup
-
-Set the workspace path:
-
-```bash
-echo 'export ISAAC_ROS_WS=${HOME}/igvc2025/isaac_ros-dev' >> ~/.bashrc
-```
-
-Add a convenience alias:
-
-```bash
-echo "alias igvc_ros_run='cd \${ISAAC_ROS_WS}/src/isaac_ros_common && ./scripts/run_dev.sh -d \${ISAAC_ROS_WS}'" >> ~/.bashrc
-source ~/.bashrc
-```
 
 ---
 
@@ -199,8 +199,9 @@ source ~/.bashrc
 | Purpose        | Command                                                           |
 | -------------- | ----------------------------------------------------------------- |
 | NVBlox Mapping | `ros2 launch nvblox_examples_bringup realsense_example.launch.py` |
-| Nav2 (MPPI)    | `ros2 launch nav2_bringup navigation_launch.py`                   |
-| RViz           | `rviz2`                                                           |
+| Nav2 (RS)      | `ros2 launch vehicle_control_unit navigation_rs.launch.py`        |
+| Nav2 (ZED)     | `ros2 launch vehicle_control_unit navigation_zed.launch.py`       |
+| Manual Control | `ros2 launch vehicle_control_unit vehicle_control.launch.py`      |
 
 ---
 
@@ -216,7 +217,6 @@ source ~/.bashrc
 
 * GPS + VIO fusion
 * Robust navigation in degraded GPS
-* TAP-IN tactile interface integration
 
 ---
 
@@ -225,11 +225,3 @@ source ~/.bashrc
 **Dr. Hyung-Jin Yoon**
 Assistant Professor, Mechanical Engineering
 Tennessee Technological University
-
----
-
-If you want, next I can:
-
-* Split this into `docs/ARCHITECTURE.md`
-* Add a **quick-start minimal launch path**
-* Align this with IGVC rule constraints (E-stop, height, autonomy rules)

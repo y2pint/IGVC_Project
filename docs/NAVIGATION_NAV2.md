@@ -1,1 +1,1 @@
-![Nav2](doc/figures/nav2.png)
+![Nav2](docs/figures/nav2.png)
