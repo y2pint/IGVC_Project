@@ -111,7 +111,7 @@ git lfs install --skip-repo
 
 ```bash
 git clone --recurse-submodules https://github.com/LCAS-Lab/TnTechIGVC2026.git
-cd igvc2025
+cd TnTechIGVC2026
 git lfs pull
 ```
 
@@ -120,7 +120,7 @@ git lfs pull
 ## 🧩 If the Repository Was Already Cloned
 
 ```bash
-cd igvc2025
+cd TnTechIGVC2026
 git submodule update --init --recursive
 git lfs install
 git lfs pull
