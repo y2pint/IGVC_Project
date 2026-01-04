@@ -164,6 +164,8 @@ This project requires **host-level configuration** in addition to the standard I
 
 Follow NVIDIA’s official setup guides for baseline configuration:
 
+https://nvidia-isaac-ros.github.io/v/release-3.2/getting_started/index.html
+
 * Isaac ROS Hardware Setup
 * Jetson VPI Setup
 * Isaac ROS Development Environment Setup
@@ -194,7 +196,7 @@ The following documents address **hardware, drivers, and communication layers** 
   * CAN IDs and termination
   * ROS 2 CAN integration and validation
 
-* **[`ZED_SDK_HOST_Installation.md`](docs/ZED_SDK_HOST_Installation.md)**
+* **[`ZED_SDK_HOST_Installation.md`](docs/ZED_SDK_HOST_INSTALLATION.md)**
   Native ZED SDK installation on Jetson:
 
   * Host-side installation (outside Docker)

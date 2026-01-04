@@ -3,9 +3,10 @@
 This document describes the **host-native installation of the Stereolabs ZED SDK** on **NVIDIA Jetson Orin AGX** running **JetPack 6.x (L4T 36.x)**, followed by required post-installation setup for ROS 2 and navigation.
 
 This setup is validated on:
-- Jetson Orin AGX
-- Ubuntu 22.04 (JetPack 6.x, L4T 36.4+)
-- ZED / ZED2 / ZED2i cameras
+
+* Jetson Orin AGX
+* Ubuntu 22.04 (JetPack 6.x, L4T 36.4+)
+* ZED / ZED2 / ZED2i cameras
 
 ---
 
@@ -13,7 +14,7 @@ This setup is validated on:
 
 ```bash
 cat /etc/nv_tegra_release
-````
+```
 
 Expected output contains:
 
@@ -95,6 +96,13 @@ A message like below is expected and good:
 
 ```
 [SVO] Hardware compression (NVENC) available
+```
+
+If you encounter a **Permission Denied** error, ensure that you have updated the file permissions and ownership for ZED tools:
+
+```bash
+sudo chmod +x /usr/local/zed/tools/ZED_Explorer
+sudo chown -R $USER:$USER /usr/local/zed
 ```
 
 ---
@@ -202,5 +210,3 @@ After ZED SDK installation:
 * [https://www.stereolabs.com/docs](https://www.stereolabs.com/docs)
 * [https://github.com/stereolabs/zed-docker](https://github.com/stereolabs/zed-docker)
 * [https://developer.nvidia.com/embedded/jetpack](https://developer.nvidia.com/embedded/jetpack)
-
----

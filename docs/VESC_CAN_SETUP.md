@@ -107,22 +107,86 @@ This design choice was made to ensure **robustness, scalability, and electrical 
 
 ### 6.1 Hardware Interface Options
 
-- Requires:
-  - CAN transceiver (e.g., SN65HVD230)
-  - Correct pin muxing
-- More setup effort, but lower latency
+For CAN communication on Jetson devices, you will need the following:
+
+* **CAN transceiver** (e.g., **SN65HVD230**) to interface between the Jetson and the CAN bus.
+* **Correct pin muxing** for CAN communication. Jetson devices typically require proper pinmux configuration to route GPIO pins for CAN functionality.
+* **More setup effort** may be required for custom hardware, but using CAN provides **lower latency** and more robust communication compared to USB or UART.
+
+### 6.2 GPIO Pin Setup for CAN (via `jetson-gpio-pinmux-lookup`)
+
+For Jetson devices using **custom hardware** or if there is a need to adjust pinmux settings for CAN, NVIDIA provides the **`jetson-gpio-pinmux-lookup`** tool as part of **JetPack**. This tool allows you to inspect and verify GPIO pin configurations, ensuring that the pins you plan to use for CAN are correctly routed to the CAN bus.
+
+#### Steps to Use `jetson-gpio-pinmux-lookup`
+
+1. **Install Jetson.GPIO** (if not already installed):
+
+   ```bash
+   sudo apt-get install python3-jetson-gpio
+   ```
+
+2. **Look Up Pinmux for CAN Pins**:
+
+   The **`jetson-gpio-pinmux-lookup`** tool helps you verify if the CAN pins are correctly assigned. For example, to check the pinmux settings of **GPIO pin 15**, run:
+
+   ```bash
+   sudo jetson-gpio-pinmux-lookup 15
+   ```
+
+   This command will return information about the pinmux configuration of pin 15 and indicate whether it's routed to CAN or another function.
+
+3. **Configuring CAN Pinmux (Device Tree Overlay)**:
+
+   If the GPIO pins for CAN (CAN_H and CAN_L) are not correctly routed, you will need to modify the device tree by creating a **device tree overlay** to configure the pins for CAN.
+
+   * **Generate Device Tree Overlay**:
+     You can use the **NVIDIA pinmux spreadsheet** or manually edit the **device tree** to enable CAN functionality on your custom Jetson hardware.
+
+     * **Pinmux Spreadsheet**: Use the official NVIDIA pinmux spreadsheet to generate and apply a device tree overlay for CAN.
+     * **Device Tree Modification**: If you are comfortable editing device trees, you can manually configure the CAN pins and recompile the device tree.
+
+   * **Apply the Device Tree Overlay**:
+     After generating or modifying the overlay, apply it with the following commands:
+
+     ```bash
+     sudo dtc -I dts -O dtb -o /boot/dtb/your-overlay.dtb /path/to/overlay.dts
+     sudo reboot
+     ```
+
+4. **Verify CAN Pinmux**:
+
+   Once the overlay is applied, you can recheck the pinmux configuration using **`jetson-gpio-pinmux-lookup`** or verify CAN communication with **`candump`** after bringing up the CAN interface:
+
+   ```bash
+   ip -details link show can0
+   ```
+
+#### Important Notes
+
+* **Device Tree Overlays**: Be cautious when modifying device tree overlays to ensure that pins are correctly routed for CAN. Incorrect pinmux can lead to communication issues.
+* **CAN Transceiver**: For CAN to work, you need a **CAN transceiver** (e.g., SN65HVD230) to interface between the Jetson GPIO and the CAN bus.
+* **`jetson-io.py` Tool**: While **`jetson-io.py`** helps configure various interfaces, it does **not** support CAN pin configuration for all Jetson devices. For custom setups, changes to the device tree via overlays are necessary.
 
 ---
 
-### 6.2 Bring Up CAN Interface (SocketCAN)
+### 6.3 Bring Up CAN Interface (SocketCAN)
+
+Once your CAN transceiver and pinmux settings are correct, you can bring up the CAN interface (`can0`) using **SocketCAN**.
 
 ```bash
+# Bring down the CAN interface before configuration
 sudo ip link set can0 down
-sudo ip link set can0 type can bitrate 500000
-sudo ip link set can0 up
-````
 
-Verify:
+# Set the bitrate (500 kbps is standard for VESC communication)
+sudo ip link set can0 type can bitrate 500000
+
+# Bring up the CAN interface
+sudo ip link set can0 up
+```
+
+#### Verify CAN Interface
+
+Check that the CAN interface is active:
 
 ```bash
 ip -details link show can0
@@ -130,21 +194,21 @@ ip -details link show can0
 
 ---
 
-### 6.3 Test CAN Traffic
+### 6.4 Test CAN Traffic
 
-Install tools:
+To test CAN communication and monitor traffic, install **can-utils**:
 
 ```bash
 sudo apt install can-utils
 ```
 
-Monitor traffic:
+Then, monitor the CAN traffic:
 
 ```bash
 candump can0
 ```
 
-If VESCs are powered and configured correctly, you should see periodic status frames.
+If your VESCs are powered and correctly configured, you should see periodic **status frames** sent over the CAN bus.
 
 ---
 
