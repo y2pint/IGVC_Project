@@ -1,7 +1,3 @@
-
----
-
-````markdown
 # ZED SDK Installation (Jetson Orin AGX – Host Native)
 
 This document describes the **host-native installation of the Stereolabs ZED SDK** on **NVIDIA Jetson Orin AGX** running **JetPack 6.x (L4T 36.x)**, followed by required post-installation setup for ROS 2 and navigation.
