@@ -99,13 +99,13 @@ controller_server:
       transform_tolerance: 0.1
       temperature: 0.3
       gamma: 0.015
-      motion_model: "Ackermann"  # DiffDrive
+      motion_model: "DiffDrive"  # Ackermann
       visualize: true
       reset_period: 1.0
       regenerate_noises: false
       # 🔽 Added minimum turning radius support
-      min_turning_radius: 0.35
-      enable_min_turning_radius: true
+      min_turning_radius: 0.0
+      enable_min_turning_radius: false
       TrajectoryVisualizer:
         trajectory_step: 5
         time_step: 3
@@ -216,7 +216,8 @@ global_costmap:
       global_frame: map
       robot_base_frame: base_link
       use_sim_time: False
-      footprint: "[ [0.15, 0.14], [0.15, -0.14], [-0.15, -0.14], [-0.15, 0.14] ]"
+      footprint: "[[0.55, 0.32], [0.55, -0.32], [-0.55, -0.32], [-0.55, 0.32]]"
+      footprint_padding: 0.03
       resolution: 0.05
       width: 40
       height: 40

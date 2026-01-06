@@ -90,15 +90,6 @@ def generate_launch_description() -> LaunchDescription:
         )
     )
 
-    # # Launch SLLIDAR C1
-    # actions.append(
-    #     lu.include(
-    #         'sllidar_ros2',
-    #         'launch/sllidar_c1_launch.py',
-    #         {},
-    #     )
-    # )
-
     # Visual SLAM
     actions.append(
         lu.include(
@@ -127,14 +118,20 @@ def generate_launch_description() -> LaunchDescription:
     )
 
 
-    # Static TF base_link ↔ camera0_link
+    # Static TF: base_link → camera0_link
     actions.append(
         Node(
             package='tf2_ros',
             executable='static_transform_publisher',
-            arguments=['0.2', '0', '0', '0', '0', '0', 'base_link', 'camera0_link']
+            arguments=[
+                '0.500', '0.0', '1.27',   # x y z (meters)
+                '0.0', '0.0', '0.0',      # roll pitch yaw (radians)
+                'base_link',
+                'camera0_link'
+            ]
         )
     )
+
 
     # Static TF base_link ↔ laser
     actions.append(
