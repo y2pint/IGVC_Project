@@ -151,9 +151,16 @@ Add the following content:
 
 ```bash
 # Pixhawk (PX4 / ArduPilot)
-SUBSYSTEM=="tty", ATTRS{idVendor}=="26ac", ATTRS{idProduct}=="0011", \
-MODE="0666", GROUP="dialout", SYMLINK+="pixhawk"
+SUBSYSTEM=="tty", \
+ATTRS{idVendor}=="1209", \
+ATTRS{idProduct}=="5741", \
+ATTRS{manufacturer}=="ArduPilot", \
+SYMLINK+="pixhawk", \
+MODE="0666"
 ```
+
+
+
 
 ### Notes
 
