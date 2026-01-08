@@ -89,8 +89,8 @@ controller_server:
       time_steps: 30
       model_dt: 0.05
       batch_size: 1000
-      vx_std: 0.2
-      wz_std: 0.4
+      vx_std: 0.4
+      wz_std: 0.2
       vx_max: 1.0
       vx_min: -1.0
       wz_max: 1.0
@@ -168,8 +168,8 @@ local_costmap:
   local_costmap:
     ros__parameters:
       footprint_padding: 0.03
-      update_frequency: 5.0
-      publish_frequency: 2.0
+      update_frequency: 10.0
+      publish_frequency: 10.0
       global_frame: odom
       robot_base_frame: base_link
       rolling_window: true
@@ -177,7 +177,7 @@ local_costmap:
       height: 6
       resolution: 0.05
       transform_tolerance: 0.3
-      footprint: "[ [0.15, 0.14], [0.15, -0.14], [-0.15, -0.14], [-0.15, 0.14] ]"
+      footprint: "[[0.55, 0.32], [0.55, -0.32], [-0.55, -0.32], [-0.55, 0.32]]"
       mark_threshold: 2
       always_send_full_costmap: True
       # plugins: ['nvblox_layer', 'inflation_layer']
