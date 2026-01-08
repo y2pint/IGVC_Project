@@ -151,9 +151,7 @@ Visualization Manager:
             Reliability Policy: Reliable
             Value: /nvblox_node/color_layer
           Value: true
-        - Ceiling Height: 1.5
-          Class: nvblox_rviz_plugin/NvbloxMesh
-          Cut Ceiling: false
+        - Class: nvblox_rviz_plugin/NvbloxMesh
           Enabled: false
           Name: NvbloxMesh
           Topic:
@@ -441,6 +439,19 @@ Visualization Manager:
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: MarkerArray
+      Namespaces:
+        Candidate Trajectories: true
+        Optimal Trajectory: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /trajectories
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 212; 212; 212
@@ -487,7 +498,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 6.262160778045654
+      Distance: 6.813082218170166
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -502,10 +513,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.45979681611061096
+      Pitch: 0.7147967219352722
       Target Frame: camera0_link
       Value: Orbit (rviz_default_plugins)
-      Yaw: 2.0904037952423096
+      Yaw: 2.770404100418091
     Saved: ~
 Window Geometry:
   Color Image:
