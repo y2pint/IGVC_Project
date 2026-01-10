@@ -22,6 +22,13 @@ rviz_files = [
     for f in glob(os.path.join('config', '**', '*.rviz'), recursive=True)
 ]
 
+# Collect URDF / Xacro files recursively
+urdf_files = [
+    (os.path.join('share', package_name, os.path.dirname(f)), [f])
+    for f in glob(os.path.join('urdf', '**', '*'), recursive=True)
+    if os.path.isfile(f)
+]
+
 setup(
     name=package_name,
     version='0.1.0',
@@ -31,7 +38,7 @@ setup(
         ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
         # Include the package.xml
         ('share/' + package_name, ['package.xml']),
-    ] + launch_files + config_files + rviz_files,
+    ] + launch_files + config_files + rviz_files + urdf_files,
     install_requires=['setuptools'],
     zip_safe=False,
     maintainer='Your Name',
@@ -52,6 +59,9 @@ setup(
 
             # NEW: VESC Can
             'vesc_can_node = vehicle_control_unit.vesc_can_node:main',
+
+            # NEW: Wheel Odom
+            'wheel_odom_node = vehicle_control_unit.vesc_erpm_wheel_odom:main',
 
         ],
     },

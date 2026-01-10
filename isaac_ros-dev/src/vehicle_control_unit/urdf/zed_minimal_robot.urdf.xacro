@@ -1,0 +1,89 @@
+<?xml version="1.0"?>
+<robot name="zed_minimal_robot" xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <!-- ===================== -->
+  <!-- Arguments -->
+  <!-- ===================== -->
+  <xacro:arg name="camera_name"     default="zed"/>
+  <xacro:arg name="camera_model"    default="zed2i"/>
+  <xacro:arg name="custom_baseline" default="0.0"/>
+
+  <!-- GNSS (optional, unused for now) -->
+  <xacro:arg name="enable_gnss" default="false"/>
+  <xacro:arg name="gnss_x" default="0.0"/>
+  <xacro:arg name="gnss_y" default="0.0"/>
+  <xacro:arg name="gnss_z" default="0.0"/>
+
+  <!-- ===================== -->
+  <!-- Base Footprint (2D reference) -->
+  <!-- ===================== -->
+  <link name="base_footprint"/>
+
+  <!-- ===================== -->
+  <!-- Base Link (robot body) -->
+  <!-- ===================== -->
+  <link name="base_link">
+
+    <inertial>
+      <origin xyz="0 0 0"/>
+      <mass value="20.0"/>
+      <inertia
+        ixx="1.0" ixy="0.0" ixz="0.0"
+        iyy="1.0" iyz="0.0"
+        izz="1.0"/>
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.60 0.40 0.30"/>
+      </geometry>
+      <material name="robot_gray">
+        <color rgba="0.7 0.7 0.7 0.8"/>
+      </material>
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.60 0.40 0.30"/>
+      </geometry>
+    </collision>
+
+  </link>
+
+  <!-- base_footprint -> base_link -->
+  <joint name="base_footprint_to_base_link" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 0.15" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ===================== -->
+  <!-- Include ZED macro -->
+  <!-- ===================== -->
+  <xacro:include filename="$(find zed_wrapper)/urdf/zed_macro.urdf.xacro"/>
+
+  <!-- ===================== -->
+  <!-- ZED Camera (sensor only) -->
+  <!-- ===================== -->
+  <xacro:zed_camera
+      name="$(arg camera_name)"
+      model="$(arg camera_model)"
+      custom_baseline="$(arg custom_baseline)"
+      enable_gnss="$(arg enable_gnss)">
+    <origin
+      xyz="$(arg gnss_x) $(arg gnss_y) $(arg gnss_z)"
+      rpy="0 0 0"/>
+  </xacro:zed_camera>
+
+  <!-- ===================== -->
+  <!-- base_link -> ZED camera -->
+  <!-- ===================== -->
+  <joint name="base_to_$(arg camera_name)" type="fixed">
+    <parent link="base_link"/>
+    <child link="$(arg camera_name)_camera_link"/>
+    <origin xyz="0.50 0.0 1.30" rpy="0 0 0"/>
+  </joint>
+
+</robot>
