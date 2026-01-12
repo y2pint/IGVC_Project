@@ -3,6 +3,9 @@ import isaac_ros_launch_utils as lu
 
 from nvblox_ros_python_utils.nvblox_launch_utils import NvbloxMode, NvbloxCamera
 from nvblox_ros_python_utils.nvblox_constants import NVBLOX_CONTAINER_NAME
+from launch.actions import SetEnvironmentVariable
+from launch.actions import TimerAction
+from launch_ros.actions import PushRosNamespace
 
 import os
 from ament_index_python.packages import get_package_share_directory
@@ -22,8 +25,107 @@ def generate_launch_description() -> LaunchDescription:
     args.add_arg('use_foxglove_whitelist', True, description='Disable bandwidth-heavy topics in Foxglove.', cli=True)
     actions = args.get_launch_actions()
 
+
     # Container
-    actions.append(lu.component_container(NVBLOX_CONTAINER_NAME, log_level=args.log_level))
+    actions.append(
+        lu.component_container(
+            NVBLOX_CONTAINER_NAME,
+            log_level='warn'   # or 'error'
+        )
+    )
+
+    # ------------------------------------------------
+    # MAVROS (isolated launch context)
+    # ------------------------------------------------
+    actions.append(
+        GroupAction([
+            PushRosNamespace('mavros'),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    os.path.join(
+                        get_package_share_directory('vehicle_control_unit'),
+                        'launch',
+                        'mavros_apm.launch.py'
+                    )
+                )
+            )
+        ])
+    )
+
+    # # ------------------------------------------------
+    # # MAVROS (ArduPilot)
+    # # ------------------------------------------------
+    # actions.append(
+    #     IncludeLaunchDescription(
+    #         PythonLaunchDescriptionSource(
+    #             os.path.join(
+    #                 get_package_share_directory('vehicle_control_unit'),
+    #                 'launch',
+    #                 'mavros_apm.launch.py'
+    #             )
+    #         )
+    #     )
+    # )
+
+    # ------------------------------------------------
+    # RC → /cmd_vel bridge
+    # ------------------------------------------------
+    actions.append(
+        Node(
+            package='vehicle_control_unit',
+            executable='rc_to_cmd_vel',
+            name='rc_to_cmd_vel',
+            output='screen'
+        )
+    )
+
+    # ------------------------------------------------
+    # VESC CAN Nodes
+    # ------------------------------------------------
+    actions.append(
+        Node(
+            package='vehicle_control_unit',
+            executable='vesc_can_node',
+            name='left_vesc',
+            output='screen',
+            parameters=[
+                {'vesc_id': 70},
+                {'vesc_name': 'left_vesc'}
+            ]
+        )
+    )
+
+    actions.append(
+        Node(
+            package='vehicle_control_unit',
+            executable='vesc_can_node',
+            name='right_vesc',
+            output='screen',
+            parameters=[
+                {'vesc_id': 8},
+                {'vesc_name': 'right_vesc'}
+            ]
+        )
+    )
+
+    # ------------------------------------------------
+    # /cmd_vel → wheel RPM (diff drive)
+    # ------------------------------------------------
+    actions.append(
+        Node(
+            package='vehicle_control_unit',
+            executable='cmd_vel_node',
+            name='cmd_vel_to_wheel_rpm',
+            output='screen',
+            parameters=[
+                {
+                    'wheel_radius': 0.095,   # meters
+                    'track_width': 0.38,     # meters
+                    'gear_ratio': 4.0
+                }
+            ]
+        )
+    )
 
     # ZED driver
     actions.append(
@@ -76,49 +178,6 @@ def generate_launch_description() -> LaunchDescription:
         )
     )
 
-    # # ------------------------------------------------
-    # # Robot Localization EKF (wheel odom + ZED IMU)
-    # # ------------------------------------------------
-    # ekf_params_path = os.path.join(
-    #     get_package_share_directory('vehicle_control_unit'),
-    #     'config',
-    #     'ekf_odom_zed.yaml'
-    # )
-
-    # actions.append(
-    #     Node(
-    #         package='robot_localization',
-    #         executable='ekf_node',
-    #         name='ekf_odom',
-    #         output='screen',
-    #         parameters=[
-    #             ekf_params_path,
-    #             {'use_sim_time': False}
-    #         ],
-    #     )
-    # )
-
-    # # ------------------------------------------------
-    # # Robot Localization EKF (wheel odom + ZED IMU)
-    # # ------------------------------------------------
-    # ekf_params_path = os.path.join(
-    #     get_package_share_directory('vehicle_control_unit'),
-    #     'config',
-    #     'ekf_odom_zed.yaml'
-    # )
-
-    # actions.append(
-    #     Node(
-    #         package='robot_localization',
-    #         executable='ekf_node',
-    #         name='ekf_odom',
-    #         output='screen',
-    #         parameters=[
-    #             ekf_params_path,
-    #             {'use_sim_time': False}
-    #         ],
-    #     )
-    # )
 
     # ------------------------------------------------
     # Robot Localization EKF (LOCAL)
@@ -150,18 +209,37 @@ def generate_launch_description() -> LaunchDescription:
     # Robot Localization EKF (GLOBAL)
     # Publishes: map -> odom
     # ------------------------------------------------
-    static_map_to_odom = Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        name='map_to_odom_bootstrap',
-        arguments=[
-            '0', '0', '0',   # x y z
-            '0', '0', '0',   # roll pitch yaw
-            'map',
-            'odom'
-        ]
+    # static_map_to_odom = Node(
+    #     package='tf2_ros',
+    #     executable='static_transform_publisher',
+    #     name='map_to_odom_bootstrap',
+    #     arguments=[
+    #         '0', '0', '0',   # x y z
+    #         '0', '0', '0',   # roll pitch yaw
+    #         'map',
+    #         'odom'
+    #     ]
+    # )
+    # actions.append(static_map_to_odom)
+
+    # map → odom bootstrap
+    actions.append(
+        Node(
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            arguments=['0','0','0','0','0','0','map','odom']
+        )
     )
-    actions.append(static_map_to_odom)
+
+    # odom → base_link bootstrap
+    actions.append(
+        Node(
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            arguments=['0','0','0','0','0','0','odom','base_link']
+        )
+    )   
+
 
 
     ekf_global_params_path = os.path.join(
@@ -206,17 +284,35 @@ def generate_launch_description() -> LaunchDescription:
         'config',
         'nav2_params.yaml'
     )
+    # actions.append(
+    #     lu.include(
+    #         'nav2_bringup',
+    #         'launch/navigation_launch.py',
+    #         {
+    #             'use_sim_time': 'false',
+    #             'params_file': nav2_params_path,
+    #             'log_level': 'error'
+    #         }
+    #     )
+    # )
+
     actions.append(
-        lu.include(
-            'nav2_bringup',
-            'launch/navigation_launch.py',
-            {
-                'use_sim_time': 'false',
-                'params_file': nav2_params_path,
-                'log_level': 'error'
-            }
+        TimerAction(
+            period=10.0,
+            actions=[
+                lu.include(
+                    'nav2_bringup',
+                    'launch/navigation_launch.py',
+                    {
+                        'use_sim_time': 'false',
+                        'params_file': nav2_params_path,
+                        'log_level': 'error'
+                    }
+                )
+            ]
         )
-    )
+)
+
 
     # Visualization
     actions.append(

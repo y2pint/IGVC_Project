@@ -20,6 +20,8 @@ def generate_launch_description():
         }.items()
     )
 
+    
+
     # Set MAVLink message intervals for critical data (higher rate) and non-critical data (lower rate)
     set_rc_rate = ExecuteProcess(
         cmd=[
