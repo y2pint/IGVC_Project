@@ -63,6 +63,15 @@ setup(
             # NEW: Wheel Odom
             'wheel_odom_node = vehicle_control_unit.vesc_erpm_wheel_odom:main',
 
+            # NEW: Wheel Odom
+            'status_monitor_gateway = vehicle_control_unit.status_monitor_gateway:main',
+
+            # NEW: Goal Reach Checker
+            'goal_reach_checker_node = vehicle_control_unit.goal_reach_checker_node:main',
+
+            # NEW: NAV2 GOAL CANCEL
+            'nav2_goal_cancel_node = vehicle_control_unit.nav2_goal_cancel_node:main',
+
         ],
     },
 )

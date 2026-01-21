@@ -22,7 +22,7 @@ class RCToCmdVel(Node):
         self.declare_parameter('pwm_range', 500)
         self.declare_parameter('deadzone', 50)
 
-        self.declare_parameter('max_linear_vel', 1.0)   # m/s
+        self.declare_parameter('max_linear_vel', 1.5)   # m/s
         self.declare_parameter('max_angular_vel', 1.0)  # rad/s
 
         self.ch_linear = self.get_parameter('ch_linear').value

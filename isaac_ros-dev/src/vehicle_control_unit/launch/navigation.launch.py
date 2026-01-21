@@ -13,6 +13,7 @@ from launch.actions import (
     GroupAction,
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.conditions import IfCondition
 from launch_ros.actions import (
     Node,
     PushRosNamespace,
@@ -61,6 +62,20 @@ def generate_launch_description() -> LaunchDescription:
         'use_foxglove_whitelist',
         True,
         description='Disable bandwidth-heavy topics in Foxglove.',
+        cli=True,
+    )
+
+    # NEW: independent goal reach checker enable switch
+    args.add_arg(
+        'enable_goal_reach_checker',
+        True,
+        description='Run independent goal reach checker node.',
+        cli=True,
+    )
+
+    args.add_arg(
+        'enable_nav2_auto_cancel',
+        True,
         cli=True,
     )
 
@@ -300,7 +315,7 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     # ------------------------------------------------
-    # Nav2 Bringup (Delayed)
+    # Nav2 Bringup (Delayed) + Independent Goal Reach Checker (Option A)
     # ------------------------------------------------
     nav2_params_path = os.path.join(
         get_package_share_directory('vehicle_control_unit'),
@@ -320,7 +335,49 @@ def generate_launch_description() -> LaunchDescription:
                         'params_file': nav2_params_path,
                         'log_level': 'error',
                     },
-                )
+                ),
+
+                # NEW: independent goal reach checker node
+                Node(
+                    package='vehicle_control_unit',           # change if your node lives elsewhere
+                    executable='goal_reach_checker_node',     # must match your installed executable/entrypoint
+                    name='goal_reach_checker',
+                    output='screen',
+                    parameters=[
+                        {
+                            # Pose source: use the EKF output you want to evaluate against.
+                            # Recommend LOCAL for arrival detection stability:
+                            'pose_topic': '/odometry/global',
+                            # Alternative:
+                            # 'pose_topic': '/odometry/local',
+
+                            # Goal source:
+                            'goal_topic': '/goal_pose',
+
+                            # Tolerances (tune for IGVC)
+                            'xy_tolerance_m': 0.40,
+                            'yaw_tolerance_rad': 0.35,
+                            'require_yaw': True,
+
+                            # Stability gating (tune)
+                            'hold_time_sec': 0.50,
+                            'consecutive_hits': 5,
+
+                            # Behavior
+                            'goal_timeout_sec': 0.0,
+                            'latch_on_reach': True,
+                        }
+                    ],
+                    condition=IfCondition(args.enable_goal_reach_checker),
+                ),
+
+                Node(
+                    package='vehicle_control_unit',
+                    executable='nav2_goal_cancel_node',
+                    name='nav2_goal_cancel',
+                    condition=IfCondition(args.enable_nav2_auto_cancel),
+                    output='screen',
+                ),
             ],
         )
     )
