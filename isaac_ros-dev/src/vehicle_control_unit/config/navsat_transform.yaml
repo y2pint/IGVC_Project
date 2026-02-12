@@ -1,0 +1,47 @@
+navsat_transform:
+  ros__parameters:
+
+    # ============================================================
+    # General
+    # ============================================================
+    use_sim_time: false
+    frequency: 20.0
+    delay: 0.0
+
+    # ============================================================
+    # Yaw handling
+    # ============================================================
+    # We rely on local EKF yaw (wheel + IMU yaw-rate)
+    # Magnetometer is NOT used at this stage
+    use_odometry_yaw: true
+
+    # These are ignored when use_odometry_yaw=true,
+    # but kept for future magnetometer-based yaw if needed
+    magnetic_declination_radians: 0.0
+    yaw_offset: 0.0
+
+    # ============================================================
+    # Datum handling (CRITICAL for stability)
+    # ============================================================
+    # Prevents map origin from shifting during GPS convergence. This is setting up the reference.
+    wait_for_datum: true
+
+    # ============================================================
+    # TF publishing (KEEP SIMPLE)
+    # ============================================================
+    # Do NOT publish UTM TF to avoid conflicts with Nav2 / map
+    broadcast_utm_transform: false
+    broadcast_utm_transform_as_parent_frame: false
+
+    # ============================================================
+    # Frame conventions
+    # ============================================================
+    world_frame: map
+    odom_frame: odom
+    base_link_frame: base_link
+
+    # ============================================================
+    # Altitude handling
+    # ============================================================
+    # Ground robot → ignore GPS altitude
+    zero_altitude: true

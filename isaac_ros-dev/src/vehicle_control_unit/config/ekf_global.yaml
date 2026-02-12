@@ -1,77 +1,90 @@
 ekf_global:
   ros__parameters:
-
-    # -----------------------
-    # Core EKF settings
-    # -----------------------
     frequency: 20.0
-    sensor_timeout: 2.0
+    sensor_timeout: 0.5
     two_d_mode: true
-    permit_corrected_publication: true
 
     publish_tf: true
     publish_acceleration: false
+    permit_corrected_publication: true
 
-    # -----------------------
-    # Debug (TEMPORARY)
-    # -----------------------
     debug: true
     debug_out_file: /tmp/ekf_global_debug.txt
     print_diagnostics: true
 
-    # -----------------------
-    # Frame conventions
-    # -----------------------
+    # Frames
     map_frame: map
     odom_frame: odom
     base_link_frame: base_link
     base_link_frame_output: base_link
-    world_frame: map            # GLOBAL EKF publishes map -> odom
+    world_frame: map   # <-- global EKF publishes map->odom
 
-    # -----------------------
-    # Input: local EKF output
-    # -----------------------
-    # This is the filtered odometry from ekf_local
+    # ------------------------------------------------------------
+    # Input 0: local EKF output
+    # Use it mainly for velocity + yaw_rate (not absolute position)
+    # ------------------------------------------------------------
     odom0: /odometry/local
     odom0_queue_size: 10
     odom0_differential: false
     odom0_relative: false
 
+    # Recommended: use TWIST (vx, vy, wz). Keep pose mostly off.
+    # State order:
     # [x, y, z,
     #  roll, pitch, yaw,
     #  vx, vy, vz,
     #  vroll, vpitch, vyaw,
     #  ax, ay, az]
-    #
-    # Rationale:
-    # - Global EKF only needs position + yaw
-    # - No velocities required
-    # - No IMU here
-    #
     odom0_config: [
-      true,  true,  false,   # x, y
-      false, false, true,    # yaw
-      false, false, false,   # linear velocity
-      false, false, false,   # angular velocity
+      false, false, false,
+      false, false, false,
+      true,  true,  false,
+      false, false, true,
       false, false, false
     ]
 
-    # -----------------------
-    # QoS overrides (CRITICAL)
-    # -----------------------
+    odom0_twist_rejection_threshold: 1.0
+    odom0_pose_rejection_threshold: 10.0
+
+    # ------------------------------------------------------------
+    # Input 1: GPS fused odometry from navsat_transform
+    # Use it for absolute x,y in map/odom (no yaw)
+    # ------------------------------------------------------------
+    odom1: /odometry/gps
+    odom1_queue_size: 10
+    odom1_differential: false
+    odom1_relative: false
+
+    odom1_config: [
+      true,  true,  false,
+      false, false, false,
+      false, false, false,
+      false, false, false,
+      false, false, false
+    ]
+
+    odom1_pose_rejection_threshold: 10.0
+    odom1_twist_rejection_threshold: 1.0
+
+    transform_timeout: 0.2
+    transform_time_offset: 0.0
+
     qos_overrides:
       /odometry/local:
         subscription:
           reliability: reliable
           history: keep_last
           depth: 10
-
+      /odometry/gps:
+        subscription:
+          reliability: reliable
+          history: keep_last
+          depth: 10
       /odometry/global:
         publisher:
           reliability: reliable
           history: keep_last
           depth: 10
-
       /tf:
         publisher:
           reliability: reliable

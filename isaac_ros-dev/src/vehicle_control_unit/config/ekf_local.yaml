@@ -1,75 +1,32 @@
 ekf_local:
   ros__parameters:
-
-    # -----------------------
-    # Core EKF settings
-    # -----------------------
     frequency: 50.0
-    sensor_timeout: 0.1
+    sensor_timeout: 0.2
     two_d_mode: true
 
     publish_tf: true
-    publish_acceleration: false
-
-    # Frame conventions
-    map_frame: map                 # required but not used for world_frame=odom
+    map_frame: map
     odom_frame: odom
     base_link_frame: base_link
-    base_link_frame_output: base_link
-    world_frame: odom              # LOCAL EKF publishes odom -> base_link
+    world_frame: odom
 
-    # -----------------------
-    # Wheel odometry (PRIMARY POSITION SOURCE)
-    # -----------------------
+    # Helps reduce control oscillation due to filter lag
+    predict_to_current_time: true
+
     odom0: /wheel/odom
-    odom0_queue_size: 10
+    odom0_queue_size: 20
     odom0_differential: false
     odom0_relative: false
 
-    # [x, y, z,
-    #  roll, pitch, yaw,
-    #  vx, vy, vz,
-    #  vroll, vpitch, vyaw,
-    #  ax, ay, az]
-    #
-    # Rationale:
-    # - Use wheel odom for x, y, yaw
-    # - Use wheel odom for vx
-    # - Do NOT trust wheel yaw rate (vyaw)
-    #
+    # PASS-THROUGH: only fuse what you truly need
+    # Recommended: x, y, yaw, vx (no vy)
     odom0_config: [
-      true,  true,  false,   # x, y
-      false, false, true,    # yaw
-      true,  false, false,   # vx
-      false, false, false,   # angular vel (ignored)
+      true,  true,  false,
+      false, false, true,
+      true,  false, false,
+      false, false, false,
       false, false, false
     ]
 
-    # -----------------------
-    # IMU (ZED) — angular velocity only
-    # -----------------------
-    imu0: /zed/zed_node/imu/data
-    imu0_queue_size: 50
-    imu0_differential: false
-    imu0_relative: false
-    imu0_remove_gravitational_acceleration: true
-
-    # Use IMU ONLY for angular velocity (yaw rate)
-    imu0_config: [
-      false, false, false,   # position
-      false, false, false,   # orientation (no roll/pitch/yaw fusion)
-      false, false, false,   # linear velocity
-      false, false, true,    # vyaw ONLY
-      false, false, false
-    ]
-
-    # -----------------------
-    # QoS overrides (CRITICAL)
-    # -----------------------
-    qos_overrides:
-      /odometry/local:
-        publisher:
-          reliability: best_effort
-          history: keep_last
-          depth: 10
-
+    # Disable IMU completely for this pass-through test
+    # imu0: ...
