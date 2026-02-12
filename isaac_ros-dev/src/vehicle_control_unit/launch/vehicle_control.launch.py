@@ -39,14 +39,14 @@ def generate_launch_description():
         package='vehicle_control_unit',
         executable='vesc_can_node',
         name='left_vesc',
-        parameters=[{'vesc_id': 70}, {'vesc_name': 'left_vesc'}]
+        parameters=[{'vesc_id': 117}, {'vesc_name': 'left_vesc'}]
         ),
 
         Node(
         package='vehicle_control_unit',
         executable='vesc_can_node',
         name='right_vesc',
-        parameters=[{'vesc_id': 8}, {'vesc_name': 'right_vesc'}]
+        parameters=[{'vesc_id': 39}, {'vesc_name': 'right_vesc'}]
         ),
 
 

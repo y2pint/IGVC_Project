@@ -1,26 +1,43 @@
-from isaac_ros_launch_utils.all_types import *
-import isaac_ros_launch_utils as lu
+# Standard library
+import os
 
-from nvblox_ros_python_utils.nvblox_launch_utils import (
-    NvbloxMode,
-    NvbloxCamera,
-)
+# ROS 2 launch
+from ament_index_python.packages import get_package_share_directory
+from launch import LaunchDescription
+from launch.actions import GroupAction, IncludeLaunchDescription, TimerAction
+from launch.conditions import IfCondition, UnlessCondition
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import PythonExpression
+from launch_ros.actions import Node, PushRosNamespace
+
+# Isaac ROS / NVBlox
+import isaac_ros_launch_utils as lu
+from nvblox_ros_python_utils.nvblox_launch_utils import NvbloxCamera, NvbloxMode
 from nvblox_ros_python_utils.nvblox_constants import NVBLOX_CONTAINER_NAME
 
-from launch.actions import (
-    SetEnvironmentVariable,
-    TimerAction,
-    GroupAction,
-)
-from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.conditions import IfCondition
-from launch_ros.actions import (
-    Node,
-    PushRosNamespace,
-)
 
-import os
-from ament_index_python.packages import get_package_share_directory
+def _pkg_share(pkg: str) -> str:
+    return get_package_share_directory(pkg)
+
+
+def _cfg(pkg: str, *relpath: str) -> str:
+    return os.path.join(_pkg_share(pkg), *relpath)
+
+
+def _node(*, package: str, executable: str, name: str, params=None, remaps=None, condition=None):
+    kwargs = dict(
+        package=package,
+        executable=executable,
+        name=name,
+        output='screen',
+    )
+    if params:
+        kwargs['parameters'] = params
+    if remaps:
+        kwargs['remappings'] = remaps
+    if condition is not None:
+        kwargs['condition'] = condition
+    return Node(**kwargs)
 
 
 def generate_launch_description() -> LaunchDescription:
@@ -29,280 +46,145 @@ def generate_launch_description() -> LaunchDescription:
     # ------------------------------------------------
     args = lu.ArgumentContainer()
 
-    args.add_arg(
-        'camera',
-        NvbloxCamera.zed2,
-        choices=[str(NvbloxCamera.zed2), str(NvbloxCamera.zedx)],
-        description='The ZED camera type.',
-        cli=True,
-    )
+    for a in [
+        dict(
+            name='camera',
+            default=NvbloxCamera.zed2,
+            choices=[str(NvbloxCamera.zed2), str(NvbloxCamera.zedx)],
+            description='The ZED camera type.',
+        ),
+        dict(name='rosbag', default='None', description='Path to rosbag (running on sensor if not set).'),
+        dict(name='rosbag_args', default='', description='Additional args for ros2 bag play.'),
+        dict(name='log_level', default='info', choices=['debug', 'info', 'warn']),
+        dict(name='use_foxglove_whitelist', default=True, description='Disable bandwidth-heavy topics in Foxglove.'),
+        dict(name='enable_goal_reach_checker', default=True, description='Run independent goal reach checker node.'),
+        dict(name='enable_nav2_auto_cancel', default=True),
 
-    args.add_arg(
-        'rosbag',
-        'None',
-        description='Path to rosbag (running on sensor if not set).',
-        cli=True,
-    )
-
-    args.add_arg(
-        'rosbag_args',
-        '',
-        description='Additional args for ros2 bag play.',
-        cli=True,
-    )
-
-    args.add_arg(
-        'log_level',
-        'info',
-        choices=['debug', 'info', 'warn'],
-        cli=True,
-    )
-
-    args.add_arg(
-        'use_foxglove_whitelist',
-        True,
-        description='Disable bandwidth-heavy topics in Foxglove.',
-        cli=True,
-    )
-
-    # NEW: independent goal reach checker enable switch
-    args.add_arg(
-        'enable_goal_reach_checker',
-        True,
-        description='Run independent goal reach checker node.',
-        cli=True,
-    )
-
-    args.add_arg(
-        'enable_nav2_auto_cancel',
-        True,
-        cli=True,
-    )
+        # NEW: indoor/outdoor mode
+        dict(
+            name='indoor',
+            default='true',
+            choices=['true', 'false'],
+            description='If true: publish static map->odom identity and do NOT run global EKF/navsat/GPS gates.',
+        ),
+    ]:
+        args.add_arg(
+            a['name'],
+            a['default'],
+            choices=a.get('choices'),
+            description=a.get('description'),
+            cli=True,
+        )
 
     actions = args.get_launch_actions()
 
     # ------------------------------------------------
-    # NVBlox Component Container
+    # Common constants
     # ------------------------------------------------
-    actions.append(
-        lu.component_container(
-            NVBLOX_CONTAINER_NAME,
-            log_level='warn',  # intentionally restricted
-        )
-    )
+    pkg = 'vehicle_control_unit'
 
-    # ------------------------------------------------
-    # MAVROS (isolated launch context)
-    # ------------------------------------------------
-    actions.append(
+    wheel_radius = 0.0891
+    track_width = 0.305
+    gear_ratio = 4.5
+
+    ekf_local_params = _cfg(pkg, 'config', 'ekf_local.yaml')
+    ekf_global_params = _cfg(pkg, 'config', 'ekf_global.yaml')
+    navsat_params = _cfg(pkg, 'config', 'navsat_transform.yaml')
+    nav2_params = _cfg(pkg, 'config', 'nav2_params.yaml')
+
+    # =============================================================================
+    # NVBlox, MAVROS, RC Bridge, VESC CAN, Differential Drive, ZED, Wheel Odom
+    # =============================================================================
+    actions += [
+        # NVBlox container
+        lu.component_container(NVBLOX_CONTAINER_NAME, log_level='warn'),
+
+        # MAVROS (isolated launch context)
         GroupAction(
             [
                 PushRosNamespace('mavros'),
                 IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(
-                        os.path.join(
-                            get_package_share_directory('vehicle_control_unit'),
-                            'launch',
-                            'mavros_apm.launch.py',
-                        )
+                        os.path.join(_pkg_share(pkg), 'launch', 'mavros_apm.launch.py')
                     )
                 ),
             ]
-        )
-    )
+        ),
 
-    # ------------------------------------------------
-    # RC → /cmd_vel Bridge
-    # ------------------------------------------------
-    actions.append(
-        Node(
-            package='vehicle_control_unit',
+        # RC → /cmd_vel Bridge
+        _node(
+            package=pkg,
             executable='rc_to_cmd_vel',
             name='rc_to_cmd_vel',
-            output='screen',
-            remappings=[
+            remaps=[
                 ('/mavros/rc/in', '/mavros/mavros/rc/in'),
                 ('/cmd_vel', '/cmd_vel'),
-            ]
-        )
-    )
+            ],
+        ),
 
-    # ------------------------------------------------
-    # VESC CAN Nodes
-    # ------------------------------------------------
-    actions.append(
-        Node(
-            package='vehicle_control_unit',
+        # VESC CAN nodes
+        _node(
+            package=pkg,
             executable='vesc_can_node',
             name='left_vesc',
-            output='screen',
-            parameters=[
-                {'vesc_id': 70},
-                {'vesc_name': 'left_vesc'},
-            ],
-        )
-    )
-
-    actions.append(
-        Node(
-            package='vehicle_control_unit',
+            params=[{'vesc_id': 117, 'vesc_name': 'left_vesc'}],
+        ),
+        _node(
+            package=pkg,
             executable='vesc_can_node',
             name='right_vesc',
-            output='screen',
-            parameters=[
-                {'vesc_id': 8},
-                {'vesc_name': 'right_vesc'},
-            ],
-        )
-    )
+            params=[{'vesc_id': 39, 'vesc_name': 'right_vesc'}],
+        ),
 
-    # ------------------------------------------------
-    # /cmd_vel → Wheel RPM (Differential Drive)
-    # ------------------------------------------------
-    actions.append(
-        Node(
-            package='vehicle_control_unit',
+        # /cmd_vel → wheel RPM
+        _node(
+            package=pkg,
             executable='cmd_vel_node',
             name='cmd_vel_to_wheel_rpm',
-            output='screen',
-            parameters=[
-                {
-                    'wheel_radius': 0.095,  # meters
-                    'track_width': 0.38,    # meters
-                    'gear_ratio': 4.0,
-                }
-            ],
-        )
-    )
+            params=[{
+                'wheel_radius': wheel_radius,
+                'track_width': track_width,
+                'gear_ratio': gear_ratio,
+            }],
+        ),
 
-    # ------------------------------------------------
-    # ZED Driver
-    # ------------------------------------------------
-    actions.append(
+        # ZED driver
         lu.include(
-            'vehicle_control_unit',
+            pkg,
             'launch/sensors/zed_new.launch.py',
             launch_arguments={
                 'container_name': NVBLOX_CONTAINER_NAME,
                 'zed_camera_model': args.camera,
             },
-        )
-    )
+        ),
 
-    # ------------------------------------------------
-    # Wheel Odometry (ERPM-based)
-    # Owns odom → base_link
-    # ------------------------------------------------
-    actions.append(
-        Node(
-            package='vehicle_control_unit',
+        # Wheel odom (publishes /wheel/odom; publish_tf=False)
+        _node(
+            package=pkg,
             executable='wheel_odom_node',
             name='wheel_odom',
-            output='screen',
-            parameters=[
-                {
-                    'wheel_radius': 0.075,
-                    'track_width': 0.38,
-                    'gear_ratio': 4.0,
-                    'pole_pairs': 7,
+            params=[{
+                'wheel_radius': wheel_radius,
+                'track_width': track_width,
+                'gear_ratio': gear_ratio,
+                'pole_pairs': 7,
 
-                    # Frames
-                    'odom_frame': 'odom',
-                    'base_frame': 'base_link',
+                'odom_frame': 'odom',
+                'base_frame': 'base_link',
 
-                    # Topics
-                    'left_erpm_topic': '/left_vesc/state/erpm',
-                    'right_erpm_topic': '/right_vesc/state/erpm',
-                    'odom_topic': '/wheel/odom',
+                'left_erpm_topic': '/left_vesc/state/erpm',
+                'right_erpm_topic': '/right_vesc/state/erpm',
+                'odom_topic': '/wheel/odom',
 
-                    # Safety / noise
-                    'erpm_deadband': 50,
+                'erpm_deadband': 50,
+                'left_sign': 1.0,
+                'right_sign': 1.0,
 
-                    # Signs (change ONLY if needed)
-                    'left_sign': 1.0,
-                    'right_sign': 1.0,
+                'publish_tf': False,
+            }],
+        ),
 
-                    'publish_tf': False,
-                }
-            ],
-        )
-    )
-
-    # ------------------------------------------------
-    # Robot Localization EKF (LOCAL)
-    # Publishes: odom → base_link
-    # ------------------------------------------------
-    ekf_local_params_path = os.path.join(
-        get_package_share_directory('vehicle_control_unit'),
-        'config',
-        'ekf_local.yaml',
-    )
-
-    actions.append(
-        Node(
-            package='robot_localization',
-            executable='ekf_node',
-            name='ekf_local',
-            output='screen',
-            parameters=[
-                ekf_local_params_path,
-                {'use_sim_time': False},
-            ],
-            remappings=[
-                ('/odometry/filtered', '/odometry/local'),
-            ],
-        )
-    )
-
-    # ------------------------------------------------
-    # TF Bootstrap (map → odom → base_link)
-    # ------------------------------------------------
-    actions.append(
-        Node(
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            arguments=['0', '0', '0', '0', '0', '0', 'map', 'odom'],
-        )
-    )
-
-    actions.append(
-        Node(
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            arguments=['0', '0', '0', '0', '0', '0', 'odom', 'base_link'],
-        )
-    )
-
-    # ------------------------------------------------
-    # Robot Localization EKF (GLOBAL)
-    # Publishes: map → odom
-    # ------------------------------------------------
-    ekf_global_params_path = os.path.join(
-        get_package_share_directory('vehicle_control_unit'),
-        'config',
-        'ekf_global.yaml',
-    )
-
-    actions.append(
-        Node(
-            package='robot_localization',
-            executable='ekf_node',
-            name='ekf_global',
-            output='screen',
-            parameters=[
-                ekf_global_params_path,
-                {'use_sim_time': False},
-            ],
-            remappings=[
-                ('/odometry/filtered', '/odometry/global'),
-            ],
-        )
-    )
-
-    # ------------------------------------------------
-    # NVBlox
-    # ------------------------------------------------
-    actions.append(
+        # NVBlox
         lu.include(
             'nvblox_examples_bringup',
             'launch/perception/nvblox.launch.py',
@@ -311,90 +193,172 @@ def generate_launch_description() -> LaunchDescription:
                 'mode': NvbloxMode.static,
                 'camera': args.camera,
             },
-        )
-    )
+        ),
+    ]
 
-    # ------------------------------------------------
-    # Nav2 Bringup (Delayed) + Independent Goal Reach Checker (Option A)
-    # ------------------------------------------------
-    nav2_params_path = os.path.join(
-        get_package_share_directory('vehicle_control_unit'),
-        'config',
-        'nav2_params.yaml',
-    )
+    # =============================================================================
+    # LOCAL EKF always on: odom -> base_link
+    # =============================================================================
+    actions += [
+        _node(
+            package='robot_localization',
+            executable='ekf_node',
+            name='ekf_local',
+            params=[ekf_local_params, {'use_sim_time': False}],
+            remaps=[('/odometry/filtered', '/odometry/local')],
+        ),
+    ]
 
-    actions.append(
+    # =============================================================================
+    # INDOOR MODE: force map == odom via static TF (map->odom identity)
+    # =============================================================================
+    actions += [
+        Node(
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            name='map_to_odom_identity',
+            output='screen',
+            # x y z yaw pitch roll frame_id child_frame_id
+            arguments=['0', '0', '0', '0', '0', '0', 'map', 'odom'],
+            condition=IfCondition(args.indoor),
+        ),
+    ]
+
+    # =============================================================================
+    # OUTDOOR MODE ONLY: GPS Gates + navsat_transform + GLOBAL EKF (map -> odom)
+    # =============================================================================
+    actions += [
+        # GPS Hard-Gater (outdoor only)
+        _node(
+            package=pkg,
+            executable='gps_hardgate_node',
+            name='gps_gate',
+            params=[{
+                'mode': 'OUTDOOR',
+                'fix_in': '/mavros/mavros/global_position/raw/fix',
+                'fix_out': '/gps/fix_hardgated',
+                'hard_var_thresh': 25.0,
+                'max_speed_mps': 5.0,
+                'odom_in': '/wheel/odom',
+                'use_odom_speed_gate': True,
+                'max_fix_age_s': 1.0,
+                'fail_behavior': 'drop',
+            }],
+            condition=UnlessCondition(args.indoor),
+        ),
+
+        # GPS Soft-Gater (outdoor only)
+        _node(
+            package=pkg,
+            executable='gps_softgate_node',
+            name='gps_softgate',
+            params=[{
+                'fix_in': '/gps/fix_hardgated',
+                'sats_in': '/mavros/mavros/global_position/raw/satellites',
+                'fix_out': '/gps/fix_gated',
+                'max_sats_age_s': 1.0,
+                'max_fix_age_s': 1.0,
+                'scale_smoothing_tau_s': 1.5,
+            }],
+            condition=UnlessCondition(args.indoor),
+        ),
+
+        # navsat_transform (outdoor only)
+        _node(
+            package='robot_localization',
+            executable='navsat_transform_node',
+            name='navsat_transform',
+            params=[
+                navsat_params,
+                {'use_sim_time': False},
+                {'gps_topic': '/gps/fix_gated'},
+            ],
+            remaps=[
+                ('gps/fix', '/gps/fix_gated'),
+                ('odometry/filtered', '/odometry/local'),
+                ('odometry/gps', '/odometry/gps'),
+                # ('imu/data', '/zed/zed_node/imu/data'),  # if needed
+            ],
+            condition=UnlessCondition(args.indoor),
+        ),
+
+        # EKF (GLOBAL): map -> odom (outdoor only)
+        _node(
+            package='robot_localization',
+            executable='ekf_node',
+            name='ekf_global',
+            params=[ekf_global_params, {'use_sim_time': False}],
+            remaps=[('/odometry/filtered', '/odometry/global')],
+            condition=UnlessCondition(args.indoor),
+        ),
+    ]
+
+    # =============================================================================
+    # Nav2 (Delayed) + Goal Reach Checker + Auto Cancel + Visualization
+    # =============================================================================
+    goal_pose_topic_expr = PythonExpression([
+        "'/odometry/local' if '", args.indoor, "' == 'true' else '/odometry/global'"
+    ])
+
+    actions += [
         TimerAction(
             period=10.0,
             actions=[
                 lu.include(
                     'nav2_bringup',
                     'launch/navigation_launch.py',
-                    {
+                    launch_arguments={
                         'use_sim_time': 'false',
-                        'params_file': nav2_params_path,
+                        'params_file': nav2_params,
                         'log_level': 'error',
                     },
                 ),
 
-                # NEW: independent goal reach checker node
-                Node(
-                    package='vehicle_control_unit',           # change if your node lives elsewhere
-                    executable='goal_reach_checker_node',     # must match your installed executable/entrypoint
+                _node(
+                    package=pkg,
+                    executable='goal_reach_checker_node',
                     name='goal_reach_checker',
-                    output='screen',
-                    parameters=[
-                        {
-                            # Pose source: use the EKF output you want to evaluate against.
-                            # Recommend LOCAL for arrival detection stability:
-                            'pose_topic': '/odometry/global',
-                            # Alternative:
-                            # 'pose_topic': '/odometry/local',
-
-                            # Goal source:
-                            'goal_topic': '/goal_pose',
-
-                            # Tolerances (tune for IGVC)
-                            'xy_tolerance_m': 0.40,
-                            'yaw_tolerance_rad': 0.35,
-                            'require_yaw': True,
-
-                            # Stability gating (tune)
-                            'hold_time_sec': 0.50,
-                            'consecutive_hits': 5,
-
-                            # Behavior
-                            'goal_timeout_sec': 0.0,
-                            'latch_on_reach': True,
-                        }
-                    ],
+                    params=[{
+                        'pose_topic': goal_pose_topic_expr,
+                        'goal_topic': '/goal_pose',
+                        'xy_tolerance_m': 0.40,
+                        'yaw_tolerance_rad': 0.35,
+                        'require_yaw': True,
+                        'hold_time_sec': 0.50,
+                        'consecutive_hits': 5,
+                        'goal_timeout_sec': 0.0,
+                        'latch_on_reach': True,
+                    }],
                     condition=IfCondition(args.enable_goal_reach_checker),
                 ),
 
-                Node(
-                    package='vehicle_control_unit',
+                _node(
+                    package=pkg,
                     executable='nav2_goal_cancel_node',
                     name='nav2_goal_cancel',
                     condition=IfCondition(args.enable_nav2_auto_cancel),
-                    output='screen',
                 ),
             ],
-        )
-    )
+        ),
 
-    # ------------------------------------------------
-    # Visualization
-    # ------------------------------------------------
-    actions.append(
         lu.include(
-            'vehicle_control_unit',
+            pkg,
             'launch/visualization/visualization.launch.py',
             launch_arguments={
                 'mode': NvbloxMode.static,
                 'camera': args.camera,
                 'use_foxglove_whitelist': args.use_foxglove_whitelist,
             },
-        )
-    )
+        ),
+    ]
+
+    # Status monitor (always-on)
+    actions += [
+        _node(
+            package='vehicle_control_unit',
+            executable='status_monitor_gateway',
+            name='status_monitor_gateway',
+        ),
+    ]
 
     return LaunchDescription(actions)
