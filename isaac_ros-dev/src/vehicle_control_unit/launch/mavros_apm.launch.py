@@ -15,63 +15,65 @@ def generate_launch_description():
             ])
         ),
         launch_arguments={
-            'fcu_url': 'serial:///dev/pixhawk:57600',
-            'time_sync': 'false'
+            'fcu_url': 'serial:///dev/ttyTHS1:57600',
+            'time_sync': 'false',
         }.items()
     )
 
-    
+    # IMPORTANT: use the fully-qualified service that exists in your graph
+    service_name = '/mavros/mavros/set_message_interval'
 
-    # Set MAVLink message intervals for critical data (higher rate) and non-critical data (lower rate)
-    set_rc_rate = ExecuteProcess(
-        cmd=[
-            'ros2', 'service', 'call',
-            '/mavros/set_message_interval',
-            'mavros_msgs/srv/MessageInterval',
-            '{message_id: 65, message_rate: 10.0}'  # RC_CHANNELS to 10 Hz (reduce)
-        ],
-        output='screen'
+    # GPS_RAW_INT (ID 24) -> /mavros/global_position/raw/*
+    set_gps_raw_int = TimerAction(
+        period=3.0,
+        actions=[
+            ExecuteProcess(
+                cmd=[
+                    'ros2', 'service', 'call',
+                    service_name,
+                    'mavros_msgs/srv/MessageInterval',
+                    '{message_id: 24, message_rate: 2.0}'
+                ],
+                output='screen'
+            )
+        ]
     )
 
-    # Reduce frequency for non-critical topics (e.g., GPS, raw data)
-    set_gps_rate = ExecuteProcess(
-        cmd=[
-            'ros2', 'service', 'call',
-            '/mavros/set_message_interval',
-            'mavros_msgs/srv/MessageInterval',
-            '{message_id: 26, message_rate: 1.0}'  # Global position data (e.g., GPS) to 1 Hz (reduce)
-        ],
-        output='screen'
+    # GLOBAL_POSITION_INT (ID 33) -> /mavros/global_position/global
+    set_global_position_int = TimerAction(
+        period=3.5,
+        actions=[
+            ExecuteProcess(
+                cmd=[
+                    'ros2', 'service', 'call',
+                    service_name,
+                    'mavros_msgs/srv/MessageInterval',
+                    '{message_id: 33, message_rate: 2.0}'
+                ],
+                output='screen'
+            )
+        ]
     )
 
-    set_imu_rate = ExecuteProcess(
-        cmd=[
-            'ros2', 'service', 'call',
-            '/mavros/set_message_interval',
-            'mavros_msgs/srv/MessageInterval',
-            '{message_id: 132, message_rate: 5.0}'  # IMU data (lower frequency for less critical)
-        ],
-        output='screen'
+    # RC_CHANNELS (ID 65) -> /mavros/rc/in
+    set_rc_channels = TimerAction(
+        period=4.0,
+        actions=[
+            ExecuteProcess(
+                cmd=[
+                    'ros2', 'service', 'call',
+                    service_name,
+                    'mavros_msgs/srv/MessageInterval',
+                    '{message_id: 65, message_rate: 10.0}'
+                ],
+                output='screen'
+            )
+        ]
     )
 
     return LaunchDescription([
         mavros_launch,
-
-        # Wait 5 seconds to ensure MAVROS is connected
-        TimerAction(
-            period=5.0,
-            actions=[set_rc_rate]
-        ),
-        
-        # # Wait 5 seconds to set GPS message interval
-        # TimerAction(
-        #     period=5.0,
-        #     actions=[set_gps_rate]
-        # ),
-        
-        # # Set IMU message interval
-        # TimerAction(
-        #     period=5.0,
-        #     actions=[set_imu_rate]
-        # ),
+        set_gps_raw_int,
+        set_global_position_int,
+        set_rc_channels,
     ])
