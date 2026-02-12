@@ -78,6 +78,9 @@ setup(
 
             # GPS Hard Gate
             "gps_hardgate_node = vehicle_control_unit.gps_hardgate_node:main",
+
+            # NAV2 LED INDICATOR
+            'nav2_led_indicator = vehicle_control_unit.nav2_led_indicator_node:main',
         ],
     },
 )
