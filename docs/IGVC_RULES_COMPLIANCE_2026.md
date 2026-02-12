@@ -96,7 +96,6 @@ The architecture supports both **GPS-denied autonomy** and **GPS-assisted naviga
 
 **Rules**
 - Minimum speed: **1 mph**
-- Maximum speed: **5 mph**
 - Speed must be **hardware-limited**
 - No changes allowed after qualification
 
