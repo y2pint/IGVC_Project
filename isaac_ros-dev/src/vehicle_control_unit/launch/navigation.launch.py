@@ -194,6 +194,22 @@ def generate_launch_description() -> LaunchDescription:
                 'camera': args.camera,
             },
         ),
+
+        # Nav2 LED indicator (blinks during NavigateToPose)
+        _node(
+            package=pkg,  # change if your node is in a different package
+            executable='nav2_led_indicator',  # entry point name (console_scripts)
+            name='nav2_led_indicator',
+            params=[{
+                'port': '/dev/arduino_led',
+                'baud': 115200,
+                'startup_delay_sec': 2.0,
+                'cmd_auto': 'MODE AUTO\n',
+                'cmd_manual': 'MODE MANUAL\n',
+                'resend_period_sec': 2.0,
+                'status_topic': '/navigate_to_pose/_action/status',
+            }],
+        ),
     ]
 
     # =============================================================================
