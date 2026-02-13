@@ -1,0 +1,21 @@
+lane_projection_node:
+  ros__parameters:
+    pixels_topic: /lane/centerline_pixels
+    camera_info_topic: /zed/zed_node/rgb/camera_info
+
+    output_frame: base_link
+    camera_frame: zed_left_camera_optical_frame   # CHANGE to your TF camera link frame if needed
+
+    # Fallback if TF lookup fails
+    cam_x_m: 0.0
+    cam_y_m: 0.0
+    cam_z_m: 1.5
+
+    # Start horizontal; update later when you pitch mount
+    camera_pitch_rad: 0.0
+
+    # Use only lower part of image to avoid horizon issues
+    min_v_frac: 0.45
+
+    lane_width_m: 0.8
+    tf_timeout_sec: 0.05

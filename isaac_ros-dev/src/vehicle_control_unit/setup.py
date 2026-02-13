@@ -81,6 +81,12 @@ setup(
 
             # NAV2 LED INDICATOR
             'nav2_led_indicator = vehicle_control_unit.nav2_led_indicator_node:main',
+
+            # LANE DETECTOR
+            'lane_detector_node = vehicle_control_unit.lane_detector_node:main',
+
+            # LANE PROJECTION
+            'lane_projection_node = vehicle_control_unit.lane_projection_node:main',
         ],
     },
 )
