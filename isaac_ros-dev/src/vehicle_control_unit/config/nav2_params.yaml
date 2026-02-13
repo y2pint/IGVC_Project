@@ -89,8 +89,8 @@ controller_server:
       time_steps: 30
       model_dt: 0.05
       batch_size: 500
-      vx_std: 0.4
-      wz_std: 0.1
+      vx_std: 0.3
+      wz_std: 0.2
       vx_max: 1.0
       vx_min: -1.0
       wz_max: 1.0
