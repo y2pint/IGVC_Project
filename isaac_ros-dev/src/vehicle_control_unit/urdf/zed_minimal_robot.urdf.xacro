@@ -80,10 +80,11 @@
   <!-- ===================== -->
   <!-- base_link -> ZED camera -->
   <!-- ===================== -->
-  <joint name="base_to_$(arg camera_name)" type="fixed">
+    <joint name="base_to_$(arg camera_name)" type="fixed">
     <parent link="base_link"/>
     <child link="$(arg camera_name)_camera_link"/>
-    <origin xyz="0.50 0.0 1.30" rpy="0 0 0"/>
+    <!-- 30 deg pitch down about +Y  => pitch = -30deg = -0.5236 rad -->
+    <origin xyz="0.50 0.0 1.50" rpy="0 0.5235987756 0"/>
   </joint>
 
 </robot>

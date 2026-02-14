@@ -180,25 +180,33 @@ local_costmap:
       footprint: "[[0.55, 0.32], [0.55, -0.32], [-0.55, -0.32], [-0.55, 0.32]]"
       mark_threshold: 2
       always_send_full_costmap: True
-      # plugins: ['nvblox_layer', 'inflation_layer']
-      plugins: ['obstacle_layer', 'nvblox_layer', 'inflation_layer']
+      plugins: ['nvblox_layer', 'lane_layer', 'inflation_layer']
+      # plugins: ['obstacle_layer', 'nvblox_layer', 'lane_layer', 'inflation_layer']
 
-      obstacle_layer:
-        plugin: "nav2_costmap_2d::ObstacleLayer"
+      lane_layer:
+        plugin: "lane_costmap_layer/LaneCostmapLayer"
         enabled: True
-        observation_sources: laser_scan_sensor
-        laser_scan_sensor:
-          topic: /scan
-          max_obstacle_height: 2.0
-          clearing: True
-          marking: True
-          data_type: LaserScan
+        lane_topic: "/lane/occupancy_grid"      # your publisher topic
+        lane_threshold: 50            # occ >= 50 means "lane boundary"
+        lane_cost: 254                # LETHAL_OBSTACLE
+        use_maximum: True             # never overwrite NVBlox / laser obstacles
+
+      # obstacle_layer:
+      #   plugin: "nav2_costmap_2d::ObstacleLayer"
+      #   enabled: True
+      #   observation_sources: laser_scan_sensor
+      #   laser_scan_sensor:
+      #     topic: /scan
+      #     max_obstacle_height: 2.0
+      #     clearing: True
+      #     marking: True
+      #     data_type: LaserScan
 
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         enabled: True
         cost_scaling_factor: 10.0
-        inflation_radius: 0.8
+        inflation_radius: 0.25
 
       nvblox_layer:
         plugin: "nvblox::nav2::NvbloxCostmapLayer"
@@ -226,25 +234,34 @@ global_costmap:
       track_unknown_space: False
       mark_threshold: 2
       always_send_full_costmap: False
-      # plugins: ['nvblox_layer', 'inflation_layer']
-      plugins: ['obstacle_layer', 'nvblox_layer', 'inflation_layer']
 
-      obstacle_layer:
-        plugin: "nav2_costmap_2d::ObstacleLayer"
-        enabled: True
-        observation_sources: laser_scan_sensor
-        laser_scan_sensor:
-          topic: /scan
-          max_obstacle_height: 2.0
-          clearing: True
-          marking: True
-          data_type: LaserScan
+      plugins: ['nvblox_layer', 'inflation_layer']
+      # plugins: ['obstacle_layer', 'nvblox_layer', 'lane_layer', 'inflation_layer']
+
+      # lane_layer:
+      #   plugin: "lane_costmap_layer/LaneCostmapLayer"
+      #   enabled: True
+      #   lane_topic: "/lane/occupancy_grid"  # (recommended) separate topic for map-frame lane
+      #   lane_threshold: 50
+      #   lane_cost: 254
+      #   use_maximum: True
+
+      # obstacle_layer:
+      #   plugin: "nav2_costmap_2d::ObstacleLayer"
+      #   enabled: True
+      #   observation_sources: laser_scan_sensor
+      #   laser_scan_sensor:
+      #     topic: /scan
+      #     max_obstacle_height: 2.0
+      #     clearing: True
+      #     marking: True
+      #     data_type: LaserScan
 
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         enabled: True
         cost_scaling_factor: 3.0
-        inflation_radius: 1.0
+        inflation_radius: 0.25
 
       nvblox_layer:
         plugin: "nvblox::nav2::NvbloxCostmapLayer"

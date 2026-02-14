@@ -87,6 +87,9 @@ setup(
 
             # LANE PROJECTION
             'lane_projection_node = vehicle_control_unit.lane_projection_node:main',
+
+            # LANE FOLLOW
+            'lane_follow_nav2_node = vehicle_control_unit.lane_follow_nav2_node:main',
         ],
     },
 )

@@ -1,0 +1,8 @@
+<library path="lane_costmap_layer">
+  <class
+    name="lane_costmap_layer/LaneCostmapLayer"
+    type="lane_costmap_layer::LaneCostmapLayer"
+    base_class_type="nav2_costmap_2d::Layer">
+    <description>Costmap layer that paints lane mask occupancy into the costmap.</description>
+  </class>
+</library>

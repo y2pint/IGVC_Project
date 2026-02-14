@@ -67,6 +67,15 @@ def generate_launch_description() -> LaunchDescription:
             choices=['true', 'false'],
             description='If true: publish static map->odom identity and do NOT run global EKF/navsat/GPS gates.',
         ),
+
+        # NEW: lane detection / projection pipeline
+        dict(
+            name='enable_lane_detection',
+            default='true',
+            choices=['true', 'false'],
+            description='If true: run lane detection + projection nodes to publish /lane_mask.',
+        ),
+
     ]:
         args.add_arg(
             a['name'],
@@ -156,6 +165,48 @@ def generate_launch_description() -> LaunchDescription:
                 'container_name': NVBLOX_CONTAINER_NAME,
                 'zed_camera_model': args.camera,
             },
+        ),
+
+        # ---------------------------------------------------------------------
+        # Lane Detection + Projection (optional)
+        # ---------------------------------------------------------------------
+        GroupAction(
+            condition=IfCondition(args.enable_lane_detection),
+            actions=[
+                # (Optional) slight delay to let camera topics start publishing
+                TimerAction(
+                    period=2.0,
+                    actions=[
+                        _node(
+                            package=pkg,
+                            executable='lane_detector_node',
+                            name='lane_detection',
+                            params=[{
+                                # if your node uses parameters to pick topics
+                                'image_topic': '/zed/zed_node/rgb/image_rect_color',
+                                # add detection params here (HSV, morphology, etc.)
+                            }],
+                        ),
+                        _node(
+                            package=pkg,
+                            executable='lane_projection_node',
+                            name='lane_projection',
+                            params=[{
+                                'camera_frame': 'zed_left_camera_optical_frame',
+                                'output_frame': 'base_link',
+                                'camera_info_topic': '/zed/zed_node/rgb/camera_info',
+                                'pixels_topic': '/lane/centerline_pixels',
+                                'path_topic': '/lane/centerline_path',
+                                'lane_mask_topic': '/lane/mask_projected',
+                                'global_frame': 'odom',     # IMPORTANT: matches local_costmap global_frame
+                                'resolution': 0.05,
+                                'width_m': 6.0,
+                                'height_m': 6.0,
+                            }],
+                        ),
+                    ],
+                ),
+            ],
         ),
 
         # Wheel odom (publishes /wheel/odom; publish_tf=False)

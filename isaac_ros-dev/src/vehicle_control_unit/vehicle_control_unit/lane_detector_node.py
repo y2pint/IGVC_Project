@@ -37,7 +37,7 @@ class LaneDetectorNode(Node):
         self.declare_parameter('camera_info_topic', '/zed/zed_node/rgb/camera_info')
 
         # ROI: use bottom fraction of image [roi_y_min_frac, 1.0]
-        self.declare_parameter('roi_y_min_frac', 0.45)
+        self.declare_parameter('roi_y_min_frac', 0.30)
 
         # HSV thresholds for WHITE (default values are a starting point)
         self.declare_parameter('white_h_min', 0)
