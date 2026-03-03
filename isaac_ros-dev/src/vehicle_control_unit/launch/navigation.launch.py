@@ -71,10 +71,30 @@ def generate_launch_description() -> LaunchDescription:
         # NEW: lane detection / projection pipeline
         dict(
             name='enable_lane_detection',
-            default='true',
+            default='false',
             choices=['true', 'false'],
             description='If true: run lane detection + projection nodes to publish /lane_mask.',
         ),
+
+        # RealSense Control
+        dict(
+            name='enable_realsense',
+            default='false',
+            choices=['true', 'false'],
+        ),
+        dict(
+            name='realsense_fps',
+            default='6',
+            choices=['6', '15', '30'],
+            description='Lowering FPS reduces USB 3.0 EMI noise for GPS.'
+        ),
+        dict(
+            name='realsense_usb_port_type',
+            default='2',
+            choices=['2', '3'],
+            description='Force USB 2.0 mode (2) to reduce high-frequency RFI, or use 3.0 (3).'
+        ),
+
 
     ]:
         args.add_arg(
@@ -100,6 +120,16 @@ def generate_launch_description() -> LaunchDescription:
     ekf_global_params = _cfg(pkg, 'config', 'ekf_global.yaml')
     navsat_params = _cfg(pkg, 'config', 'navsat_transform.yaml')
     nav2_params = _cfg(pkg, 'config', 'nav2_params.yaml')
+
+    # Check for RealSense package installation
+    rs_pkg_found = True
+    try:
+        rs_share = get_package_share_directory('realsense2_camera')
+    except PackageNotFoundError:
+        rs_pkg_found = False
+
+    # Resolution string construction (using launch substitutions)
+    rs_res_fps = PythonExpression(["'640x480x' + str(", args.realsense_fps, ")"])
 
     # =============================================================================
     # NVBlox, MAVROS, RC Bridge, VESC CAN, Differential Drive, ZED, Wheel Odom
@@ -165,6 +195,28 @@ def generate_launch_description() -> LaunchDescription:
                 'container_name': NVBLOX_CONTAINER_NAME,
                 'zed_camera_model': args.camera,
             },
+        ),
+
+        # RealSense Driver with EMI mitigation parameters
+        GroupAction(
+            condition=IfCondition(args.enable_realsense),
+            actions=[
+                IncludeLaunchDescription(
+                    PythonLaunchDescriptionSource([os.path.join(rs_share, 'launch', 'rs_launch.py')]),
+                    launch_arguments={
+                        'pointcloud.enable': 'true',
+                        'enable_depth': 'true',
+                        'enable_color': 'true',
+                        'depth_module.profile': rs_res_fps,
+                        'rgb_camera.profile': rs_res_fps,
+                        'align_depth.enable': 'true',
+                        # Reduce infrared stream rate specifically
+                        'depth_module.infra_fps': args.realsense_fps,
+                        # Set USB mode (2 = USB 2.0, 3 = USB 3.0)
+                        'usb_port_type': args.realsense_usb_port_type,
+                    }.items(),
+                ) if rs_pkg_found else LogInfo(msg="RealSense package not found.")
+            ]
         ),
 
         # ---------------------------------------------------------------------
