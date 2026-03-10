@@ -104,7 +104,7 @@ controller_server:
       reset_period: 1.0
       regenerate_noises: false
       # 🔽 Added minimum turning radius support
-      min_turning_radius: 0.0
+      min_turning_radius: 0.5
       enable_min_turning_radius: false
       TrajectoryVisualizer:
         trajectory_step: 5
@@ -127,7 +127,7 @@ controller_server:
       PreferForwardCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 10.0 #0711 Add
+        cost_weight: 20.0 #0711 Add
         threshold_to_consider: 0.5
       ObstaclesCritic:
         enabled: true
@@ -167,7 +167,7 @@ controller_server:
 local_costmap:
   local_costmap:
     ros__parameters:
-      footprint_padding: 0.03
+      footprint_padding: 0.1
       update_frequency: 10.0
       publish_frequency: 10.0
       global_frame: odom
@@ -206,7 +206,7 @@ local_costmap:
         plugin: "nav2_costmap_2d::InflationLayer"
         enabled: True
         cost_scaling_factor: 10.0
-        inflation_radius: 0.25
+        inflation_radius: 0.50
 
       nvblox_layer:
         plugin: "nvblox::nav2::NvbloxCostmapLayer"
@@ -214,6 +214,8 @@ local_costmap:
         nav2_costmap_global_frame: odom
         nvblox_map_slice_topic: "/nvblox_node/static_map_slice"
         convert_to_binary_costmap: True
+        min_height: 0.3
+        max_height: 2.0
 
 global_costmap:
   global_costmap:
@@ -261,7 +263,7 @@ global_costmap:
         plugin: "nav2_costmap_2d::InflationLayer"
         enabled: True
         cost_scaling_factor: 3.0
-        inflation_radius: 0.25
+        inflation_radius: 0.50
 
       nvblox_layer:
         plugin: "nvblox::nav2::NvbloxCostmapLayer"
@@ -269,6 +271,8 @@ global_costmap:
         nav2_costmap_global_frame: map
         nvblox_map_slice_topic: "/nvblox_node/static_map_slice"
         convert_to_binary_costmap: True
+        min_height: 0.3
+        max_height: 2.0
 
 map_server:
   ros__parameters:

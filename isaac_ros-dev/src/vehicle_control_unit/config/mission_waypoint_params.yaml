@@ -1,0 +1,16 @@
+mission_waypoint_manager_node:
+  ros__parameters:
+
+    waypoints_file: "/workspaces/isaac_ros-dev/src/vehicle_control_unit/config/mission_waypoints.yaml"
+
+    acceptance_radius_m: 2.5
+    auto_advance: true
+    loop_waypoints: false
+
+    pose_topic: "/mission/global_pose_xy"
+    origin_topic: "/mission/origin_fix"
+    target_topic: "/mission/current_waypoint_xy"
+
+    origin_latitude: 36.1756259
+    origin_longitude: -85.5085356
+    origin_altitude: 327.41380321122205

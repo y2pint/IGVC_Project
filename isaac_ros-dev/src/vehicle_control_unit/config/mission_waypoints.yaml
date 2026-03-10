@@ -1,0 +1,16 @@
+waypoints:
+  - name: start
+    latitude: 36.1756400
+    longitude: -85.5085200
+
+  - name: gate_1
+    latitude: 36.1757000
+    longitude: -85.5084300
+
+  - name: gate_2
+    latitude: 36.1757600
+    longitude: -85.5083500
+
+  - name: finish
+    latitude: 36.1758200
+    longitude: -85.5082600

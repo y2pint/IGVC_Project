@@ -85,10 +85,10 @@
       occupied_region_half_width_m: 0.1
       # view calculator
       raycast_subsampling_factor: 4
-      workspace_bounds_type: "unbounded" # ["unbounded", "height_bounds", "bounding_box"]
+      workspace_bounds_type: "height_bounds" # ["unbounded", "height_bounds", "bounding_box"]
       workspace_bounds_min_corner_x_m: 0.0
       workspace_bounds_min_corner_y_m: 0.0
-      workspace_bounds_min_height_m: -0.5
+      workspace_bounds_min_height_m: 0.3
       workspace_bounds_max_corner_x_m: 0.0
       workspace_bounds_max_corner_y_m: 0.0
       workspace_bounds_max_height_m: 2.0

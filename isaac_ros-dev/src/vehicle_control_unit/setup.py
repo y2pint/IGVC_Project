@@ -90,6 +90,29 @@ setup(
 
             # LANE FOLLOW
             'lane_follow_nav2_node = vehicle_control_unit.lane_follow_nav2_node:main',
+
+            # GPS PROJECTION
+            'gps_projection_node = vehicle_control_unit.gps_projection_node:main',
+
+            # GLOBAL EKF
+            'global_ekf_node = vehicle_control_unit.global_ekf_node:main',
+
+            # MISSION GLOBAL FRAME NODE
+            'mission_global_frame_node = vehicle_control_unit.mission_global_frame_node:main',
+
+            # MISSION WAYPOINT MANAGER NODE
+            'mission_waypoint_manager_node = vehicle_control_unit.mission_waypoint_manager_node:main',
+
+            # MISSION PLOTTER NODE
+            'mission_plotter_node = vehicle_control_unit.mission_plotter_node:main',
+
+            # CARROT TARGET NODE
+            'carrot_target_node = vehicle_control_unit.carrot_target_node:main',
+
+            # CARROT TARGET NODE
+            'carrot_to_nav2_action_node = vehicle_control_unit.carrot_to_nav2_action_node:main',
+            
+            
         ],
     },
 )

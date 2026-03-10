@@ -120,6 +120,7 @@ def generate_launch_description() -> LaunchDescription:
     ekf_global_params = _cfg(pkg, 'config', 'ekf_global.yaml')
     navsat_params = _cfg(pkg, 'config', 'navsat_transform.yaml')
     nav2_params = _cfg(pkg, 'config', 'nav2_params.yaml')
+    waypoint_params = _cfg(pkg, 'config', 'mission_waypoint_params.yaml')
 
     # Check for RealSense package installation
     rs_pkg_found = True
@@ -343,74 +344,164 @@ def generate_launch_description() -> LaunchDescription:
         ),
     ]
 
+    # # =============================================================================
+    # # OUTDOOR MODE ONLY: GPS Gates + navsat_transform + GLOBAL EKF (map -> odom)
+    # # =============================================================================
+    # actions += [
+    #     # GPS Hard-Gater (outdoor only)
+    #     _node(
+    #         package=pkg,
+    #         executable='gps_hardgate_node',
+    #         name='gps_gate',
+    #         params=[{
+    #             'mode': 'OUTDOOR',
+    #             'fix_in': '/mavros/mavros/global_position/raw/fix',
+    #             'fix_out': '/gps/fix_hardgated',
+    #             'hard_var_thresh': 25.0,
+    #             'max_speed_mps': 5.0,
+    #             'odom_in': '/wheel/odom',
+    #             'use_odom_speed_gate': True,
+    #             'max_fix_age_s': 1.0,
+    #             'fail_behavior': 'drop',
+    #         }],
+    #         condition=UnlessCondition(args.indoor),
+    #     ),
+
+    #     # GPS Soft-Gater (outdoor only)
+    #     _node(
+    #         package=pkg,
+    #         executable='gps_softgate_node',
+    #         name='gps_softgate',
+    #         params=[{
+    #             'fix_in': '/gps/fix_hardgated',
+    #             'sats_in': '/mavros/mavros/global_position/raw/satellites',
+    #             'fix_out': '/gps/fix_gated',
+    #             'max_sats_age_s': 1.0,
+    #             'max_fix_age_s': 1.0,
+    #             'scale_smoothing_tau_s': 1.5,
+    #         }],
+    #         condition=UnlessCondition(args.indoor),
+    #     ),
+
+    #     # navsat_transform (outdoor only)
+    #     _node(
+    #         package='robot_localization',
+    #         executable='navsat_transform_node',
+    #         name='navsat_transform',
+    #         params=[
+    #             navsat_params,
+    #             {'use_sim_time': False},
+    #             {'gps_topic': '/gps/fix_gated'},
+    #         ],
+    #         remaps=[
+    #             ('gps/fix', '/gps/fix_gated'),
+    #             ('odometry/filtered', '/odometry/local'),
+    #             ('odometry/gps', '/odometry/gps'),
+    #             # ('imu/data', '/zed/zed_node/imu/data'),  # if needed
+    #         ],
+    #         condition=UnlessCondition(args.indoor),
+    #     ),
+
+    #     # EKF (GLOBAL): map -> odom (outdoor only)
+    #     _node(
+    #         package='robot_localization',
+    #         executable='ekf_node',
+    #         name='ekf_global',
+    #         params=[ekf_global_params, {'use_sim_time': False}],
+    #         remaps=[('/odometry/filtered', '/odometry/global')],
+    #         condition=UnlessCondition(args.indoor),
+    #     ),
+    # ]
+
     # =============================================================================
-    # OUTDOOR MODE ONLY: GPS Gates + navsat_transform + GLOBAL EKF (map -> odom)
+    # OUTDOOR MODE ONLY: simple GPS projection + custom GLOBAL EKF
     # =============================================================================
     actions += [
-        # GPS Hard-Gater (outdoor only)
+        # GPS projection: raw NavSatFix -> projected odometry
         _node(
             package=pkg,
-            executable='gps_hardgate_node',
-            name='gps_gate',
+            executable='gps_projection_node',
+            name='gps_projection',
             params=[{
-                'mode': 'OUTDOOR',
-                'fix_in': '/mavros/mavros/global_position/raw/fix',
-                'fix_out': '/gps/fix_hardgated',
-                'hard_var_thresh': 25.0,
-                'max_speed_mps': 5.0,
-                'odom_in': '/wheel/odom',
-                'use_odom_speed_gate': True,
-                'max_fix_age_s': 1.0,
-                'fail_behavior': 'drop',
+                'fix_topic': '/mavros/mavros/global_position/raw/fix',
+                'odom_topic': '/gps/odom_projected',
+                # Add any projection-specific params here if your node uses them
+                # 'use_covariance': True,
+                # 'frame_id': 'map',
+                # 'child_frame_id': 'gps_link',
             }],
             condition=UnlessCondition(args.indoor),
         ),
 
-        # GPS Soft-Gater (outdoor only)
+        # Custom GLOBAL EKF: /odometry/local + /gps/odom_projected -> /odometry/global
         _node(
             package=pkg,
-            executable='gps_softgate_node',
-            name='gps_softgate',
+            executable='global_ekf_node',
+            name='global_ekf',
             params=[{
-                'fix_in': '/gps/fix_hardgated',
-                'sats_in': '/mavros/mavros/global_position/raw/satellites',
-                'fix_out': '/gps/fix_gated',
-                'max_sats_age_s': 1.0,
-                'max_fix_age_s': 1.0,
-                'scale_smoothing_tau_s': 1.5,
+                'use_sim_time': False,
+
+                'map_frame': 'map',
+                'odom_frame': 'odom',
+                'base_frame': 'base_link',
+
+                'local_odom_topic': '/odometry/local',
+                'gps_odom_topic': '/gps/odom_projected',
+                'global_odom_topic': '/odometry/global',
+
+                'q_x': 1,
+                'q_y': 1,
+                'q_yaw': 1,
+
+                'r_gps_x': 1024.0,
+                'r_gps_y': 1024.0,
+
+                'use_gps_gate': True,
+                'gps_gate_threshold': 9.21,
+                'diag_period_sec': 1.0,
             }],
-            condition=UnlessCondition(args.indoor),
-        ),
-
-        # navsat_transform (outdoor only)
-        _node(
-            package='robot_localization',
-            executable='navsat_transform_node',
-            name='navsat_transform',
-            params=[
-                navsat_params,
-                {'use_sim_time': False},
-                {'gps_topic': '/gps/fix_gated'},
-            ],
-            remaps=[
-                ('gps/fix', '/gps/fix_gated'),
-                ('odometry/filtered', '/odometry/local'),
-                ('odometry/gps', '/odometry/gps'),
-                # ('imu/data', '/zed/zed_node/imu/data'),  # if needed
-            ],
-            condition=UnlessCondition(args.indoor),
-        ),
-
-        # EKF (GLOBAL): map -> odom (outdoor only)
-        _node(
-            package='robot_localization',
-            executable='ekf_node',
-            name='ekf_global',
-            params=[ekf_global_params, {'use_sim_time': False}],
-            remaps=[('/odometry/filtered', '/odometry/global')],
             condition=UnlessCondition(args.indoor),
         ),
     ]
+
+
+    # Mission global frame (GPS → mission XY)
+    actions += [
+        _node(
+            package='vehicle_control_unit',
+            executable='mission_global_frame_node',
+            name='mission_global_frame_node',
+        ),
+    ]
+
+    # Mission waypoint manager (lat/lon → XY targets)
+    actions += [
+        _node(
+            package='vehicle_control_unit',
+            executable='mission_waypoint_manager_node',
+            name='mission_waypoint_manager_node',
+            params=[waypoint_params],
+        ),
+    ]
+
+    # carrot_target_node
+    actions += [
+        _node(
+            package='vehicle_control_unit',
+            executable='carrot_target_node',
+            name='carrot_target_node',
+        ),
+    ]
+
+    # carrot_to_nav2_action_node
+    actions += [
+        _node(
+            package='vehicle_control_unit',
+            executable='carrot_to_nav2_action_node',
+            name='carrot_to_nav2_action_node',
+        ),
+    ]
+    
 
     # =============================================================================
     # Nav2 (Delayed) + Goal Reach Checker + Auto Cancel + Visualization
