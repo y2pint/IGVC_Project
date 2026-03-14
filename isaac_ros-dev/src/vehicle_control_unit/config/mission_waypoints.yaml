@@ -1,16 +1,17 @@
 waypoints:
-  - name: start
-    latitude: 36.1756400
-    longitude: -85.5085200
-
-  - name: gate_1
-    latitude: 36.1757000
-    longitude: -85.5084300
-
-  - name: gate_2
-    latitude: 36.1757600
-    longitude: -85.5083500
-
-  - name: finish
-    latitude: 36.1758200
-    longitude: -85.5082600
+- name: wp_0
+  latitude: 36.17554145749507
+  longitude: -85.5084800720215
+  altitude: 0.0
+- name: wp_1
+  latitude: 36.1756973933854
+  longitude: -85.50845324993135
+  altitude: 0.0
+- name: wp_2
+  latitude: 36.1757190511234
+  longitude: -85.50866246223451
+  altitude: 0.0
+- name: wp_3
+  latitude: 36.17554578905175
+  longitude: -85.5088609457016
+  altitude: 0.0

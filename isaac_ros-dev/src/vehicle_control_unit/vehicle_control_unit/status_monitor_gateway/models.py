@@ -55,6 +55,7 @@ class GPSSnapshot:
     cov_xx: Optional[float] = None
     cov_yy: Optional[float] = None
     cov_zz: Optional[float] = None
+    compass_hdg_deg: Optional[float] = None  # degrees, 0=North, 90=East
 
 
 @dataclass
@@ -140,3 +141,29 @@ class CostmapSnapshot:
 class HealthSummary:
     ok: bool = False
     reasons: list[str] = None
+
+
+@dataclass
+class MissionWaypoint:
+    lat: float = 0.0
+    lon: float = 0.0
+    name: str = ''
+
+
+@dataclass
+class MissionSnapshot:
+    present: bool = False
+    origin_lat: Optional[float] = None   # from /mission/origin_fix — fixed projection anchor
+    origin_lon: Optional[float] = None
+    nav_enabled: bool = False            # mirrors /mission/navigation_enabled
+    waypoints: Optional[List[MissionWaypoint]] = None
+    pose_x: Optional[float] = None
+    pose_y: Optional[float] = None
+    pose_yaw_rad: Optional[float] = None
+    target_x: Optional[float] = None
+    target_y: Optional[float] = None
+    carrot_x: Optional[float] = None
+    carrot_y: Optional[float] = None
+    waypoint_index: Optional[int] = None
+    mission_complete: bool = False
+    acceptance_radius_m: float = 2.5

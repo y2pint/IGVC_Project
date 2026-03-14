@@ -14,14 +14,15 @@ from sensor_msgs.msg import NavSatFix
 from nav_msgs.msg import Odometry, OccupancyGrid
 from action_msgs.msg import GoalStatusArray
 from tf2_ros import Buffer, TransformListener
-from std_msgs.msg import Float32, Int32, UInt32
+from std_msgs.msg import Float32, Float64, Int32, UInt32, Bool, String
+from geometry_msgs.msg import PoseStamped
 
 from .qos import qos_reliable, qos_sensor
 from .utils import now_unix, clamp, yaw_from_quat
 from .models import (
     TopicFreshness, VescSnapshot, GPSSnapshot, SatSnapshot,
     OdomGpsSnapshot, LocalizationSnapshot, NavSnapshot,
-    TFHealth, GPSValidity, CostmapSnapshot, HealthSummary,
+    TFHealth, GPSValidity, CostmapSnapshot, HealthSummary, MissionSnapshot, MissionWaypoint,
 )
 
 
@@ -36,30 +37,60 @@ class StatusBridge(Node):
 
         # Topics
         self.declare_parameter("vesc_left_prefix", "/left_vesc")
+        self.declare_parameter("vesc_right_prefix", "/right_vesc")
         self.declare_parameter("gps_topic", "/mavros/mavros/global_position/global")
         self.declare_parameter("gps_sat_topic", "/mavros/mavros/global_position/raw/satellites")
+        self.declare_parameter("gps_compass_topic", "/mavros/mavros/global_position/compass_hdg")
         self.declare_parameter("odom_gps_topic", "/odometry/gps")
         self.declare_parameter("localization_topic", "/odometry/local")
         self.declare_parameter("nav_status_topic", "/navigate_to_pose/_action/status")
         self.declare_parameter("local_costmap_topic", "/local_costmap/costmap")
         self.declare_parameter("global_costmap_topic", "/global_costmap/costmap")
 
+        # Mission planner topics
+        self.declare_parameter("mission_pose_topic",              "/mission/global_pose_xy")
+        self.declare_parameter("mission_target_topic",            "/mission/current_waypoint_xy")
+        self.declare_parameter("mission_carrot_topic",            "/mission/carrot_target")
+        self.declare_parameter("mission_index_topic",             "/mission/waypoint_index")
+        self.declare_parameter("mission_complete_topic",          "/mission/mission_complete")
+        self.declare_parameter("mission_waypoints_latlon_topic",  "/mission/waypoints_latlon")
+        self.declare_parameter("mission_origin_topic",            "/mission/origin_fix")
+        self.declare_parameter("mission_nav_enabled_topic",       "/mission/navigation_enabled")
+        self.declare_parameter("mission_cancel_topic",            "/mission/cancel_nav_goal")
+        self.declare_parameter("mission_acceptance_radius_m", 2.5)
+        self.declare_parameter("mission_waypoints_file", "")
+
         self.frame_map = self.get_parameter("frame_map").value
         self.frame_odom = self.get_parameter("frame_odom").value
         self.frame_base = self.get_parameter("frame_base").value
 
         vesc_left_prefix = self.get_parameter("vesc_left_prefix").value.rstrip("/")
+        vesc_right_prefix = self.get_parameter("vesc_right_prefix").value.rstrip("/")
         gps_topic = self.get_parameter("gps_topic").value
         gps_sat_topic = self.get_parameter("gps_sat_topic").value
+        gps_compass_topic = self.get_parameter("gps_compass_topic").value
         odom_gps_topic = self.get_parameter("odom_gps_topic").value
         localization_topic = self.get_parameter("localization_topic").value
         nav_status_topic = self.get_parameter("nav_status_topic").value
         local_costmap_topic = self.get_parameter("local_costmap_topic").value
         global_costmap_topic = self.get_parameter("global_costmap_topic").value
 
+        mission_pose_topic    = self.get_parameter("mission_pose_topic").value
+        mission_target_topic  = self.get_parameter("mission_target_topic").value
+        mission_carrot_topic  = self.get_parameter("mission_carrot_topic").value
+        mission_index_topic   = self.get_parameter("mission_index_topic").value
+        mission_complete_topic = self.get_parameter("mission_complete_topic").value
+        mission_waypoints_latlon_topic = self.get_parameter("mission_waypoints_latlon_topic").value
+        mission_origin_topic  = self.get_parameter("mission_origin_topic").value
+        mission_nav_enabled_topic = self.get_parameter("mission_nav_enabled_topic").value
+        mission_cancel_topic  = self.get_parameter("mission_cancel_topic").value
+        self._mission_acceptance_radius_m = float(
+            self.get_parameter("mission_acceptance_radius_m").value)
+
         # Shared state
         self._lock = threading.Lock()
         self.vesc_left = VescSnapshot()
+        self.vesc_right = VescSnapshot()
         self.gps = GPSSnapshot()
         self.gps_sats = SatSnapshot()
         self.odom_gps = OdomGpsSnapshot()
@@ -71,6 +102,16 @@ class StatusBridge(Node):
         self.costmap_local = CostmapSnapshot()
         self.costmap_global = CostmapSnapshot()
 
+        self.mission = MissionSnapshot()
+
+        # Publishers for mission control
+        self._nav_enabled_pub = self.create_publisher(Bool, mission_nav_enabled_topic, qos_reliable)
+        self._cancel_pub      = self.create_publisher(Bool, mission_cancel_topic,      qos_reliable)
+        self._waypoints_latlon_pub = self.create_publisher(String, mission_waypoints_latlon_topic, qos_reliable)
+
+        # Subscribe back to navigation_enabled so dashboard reflects actual state
+        self.create_subscription(Bool, mission_nav_enabled_topic, self._on_nav_enabled_echo, qos_reliable)
+
         # Topic freshness
         self.topic_fresh: Dict[str, TopicFreshness] = {
             "gps_fix": TopicFreshness(),
@@ -79,6 +120,7 @@ class StatusBridge(Node):
             "localization": TopicFreshness(),
             "nav_status": TopicFreshness(),
             "vesc_left": TopicFreshness(),
+            "vesc_right": TopicFreshness(),
             "costmap_local": TopicFreshness(),
             "costmap_global": TopicFreshness(),
         }
@@ -104,10 +146,31 @@ class StatusBridge(Node):
                                  self._on_left_temp_motor, qos_reliable)
 
         # -------------------------
+        # VESC Right subscriptions (RELIABLE)
+        # -------------------------
+        self.create_subscription(Float32, f"{vesc_right_prefix}/state/input_voltage_v",
+                                 self._on_right_input_voltage, qos_reliable)
+        self.create_subscription(Float32, f"{vesc_right_prefix}/state/input_current_a",
+                                 self._on_right_input_current, qos_reliable)
+        self.create_subscription(Float32, f"{vesc_right_prefix}/state/motor_current_a",
+                                 self._on_right_motor_current, qos_reliable)
+        self.create_subscription(Float32, f"{vesc_right_prefix}/state/erpm",
+                                 self._on_right_erpm, qos_reliable)
+        self.create_subscription(Float32, f"{vesc_right_prefix}/state/duty",
+                                 self._on_right_duty, qos_reliable)
+        self.create_subscription(Int32, f"{vesc_right_prefix}/state/fault_code",
+                                 self._on_right_fault, qos_reliable)
+        self.create_subscription(Float32, f"{vesc_right_prefix}/state/temp_fet_c",
+                                 self._on_right_temp_fet, qos_reliable)
+        self.create_subscription(Float32, f"{vesc_right_prefix}/state/temp_motor_c",
+                                 self._on_right_temp_motor, qos_reliable)
+
+        # -------------------------
         # GPS (BEST_EFFORT)
         # -------------------------
         self.create_subscription(NavSatFix, gps_topic, self._on_gps, qos_sensor)
         self.create_subscription(UInt32, gps_sat_topic, self._on_gps_sats, qos_sensor)
+        self.create_subscription(Float64, gps_compass_topic, self._on_gps_compass, qos_sensor)
 
         # -------------------------
         # /odometry/gps (BEST_EFFORT is fine)
@@ -125,6 +188,17 @@ class StatusBridge(Node):
         # -------------------------
         self.create_subscription(OccupancyGrid, local_costmap_topic, self._on_costmap_local, qos_sensor)
         self.create_subscription(OccupancyGrid, global_costmap_topic, self._on_costmap_global, qos_sensor)
+
+        # -------------------------
+        # Mission planner topics
+        # -------------------------
+        self.create_subscription(NavSatFix,   mission_origin_topic,  self._on_mission_origin,  qos_reliable)
+        self.create_subscription(PoseStamped, mission_pose_topic,    self._on_mission_pose,    qos_sensor)
+        self.create_subscription(PoseStamped, mission_target_topic,  self._on_mission_target,  qos_sensor)
+        self.create_subscription(PoseStamped, mission_carrot_topic,  self._on_mission_carrot,  qos_sensor)
+        self.create_subscription(Int32,       mission_index_topic,   self._on_mission_index,   qos_reliable)
+        self.create_subscription(Bool,        mission_complete_topic, self._on_mission_complete, qos_reliable)
+        self.create_subscription(String,      mission_waypoints_latlon_topic, self._on_mission_waypoints_latlon, qos_reliable)
 
         # TF
         self.tf_buffer = Buffer()
@@ -184,6 +258,53 @@ class StatusBridge(Node):
             self._touch_vesc_left()
             self.vesc_left.temp_motor_c = float(msg.data)
 
+    # ---- VESC Right ----
+    def _touch_vesc_right(self):
+        t = now_unix()
+        self.vesc_right.present = True
+        self.vesc_right.stamp_unix = t
+        self.topic_fresh["vesc_right"].touch(t)
+
+    def _on_right_input_voltage(self, msg: Float32):
+        with self._lock:
+            self._touch_vesc_right()
+            self.vesc_right.input_voltage_v = float(msg.data)
+
+    def _on_right_input_current(self, msg: Float32):
+        with self._lock:
+            self._touch_vesc_right()
+            self.vesc_right.input_current_a = float(msg.data)
+
+    def _on_right_motor_current(self, msg: Float32):
+        with self._lock:
+            self._touch_vesc_right()
+            self.vesc_right.motor_current_a = float(msg.data)
+
+    def _on_right_erpm(self, msg: Float32):
+        with self._lock:
+            self._touch_vesc_right()
+            self.vesc_right.erpm = float(msg.data)
+
+    def _on_right_duty(self, msg: Float32):
+        with self._lock:
+            self._touch_vesc_right()
+            self.vesc_right.duty = float(msg.data)
+
+    def _on_right_fault(self, msg: Int32):
+        with self._lock:
+            self._touch_vesc_right()
+            self.vesc_right.fault_code = int(msg.data)
+
+    def _on_right_temp_fet(self, msg: Float32):
+        with self._lock:
+            self._touch_vesc_right()
+            self.vesc_right.temp_fet_c = float(msg.data)
+
+    def _on_right_temp_motor(self, msg: Float32):
+        with self._lock:
+            self._touch_vesc_right()
+            self.vesc_right.temp_motor_c = float(msg.data)
+
     # ---- GPS ----
     def _on_gps(self, msg: NavSatFix):
         t = now_unix()
@@ -206,10 +327,13 @@ class StatusBridge(Node):
         t = now_unix()
         with self._lock:
             self.topic_fresh["gps_sats"].touch(t)
-
             self.gps_sats.present = True
             self.gps_sats.stamp_unix = t
             self.gps_sats.satellites_visible = int(msg.data)
+
+    def _on_gps_compass(self, msg: Float64):
+        with self._lock:
+            self.gps.compass_hdg_deg = float(msg.data)
 
     # ---- /odometry/gps ----
     def _on_odom_gps(self, msg: Odometry):
@@ -421,9 +545,17 @@ class StatusBridge(Node):
             if self.vesc_left.fault_code != 0:
                 reasons.append(f"Left VESC fault_code={self.vesc_left.fault_code}")
 
+        if self.vesc_right.present and (self.vesc_right.fault_code is not None):
+            if self.vesc_right.fault_code != 0:
+                reasons.append(f"Right VESC fault_code={self.vesc_right.fault_code}")
+
         if self.vesc_left.present and (self.vesc_left.input_voltage_v is not None):
             if self.vesc_left.input_voltage_v < 20.0:
-                reasons.append(f"Low pack voltage: {self.vesc_left.input_voltage_v:.2f} V")
+                reasons.append(f"Low pack voltage (L): {self.vesc_left.input_voltage_v:.2f} V")
+
+        if self.vesc_right.present and (self.vesc_right.input_voltage_v is not None):
+            if self.vesc_right.input_voltage_v < 20.0:
+                reasons.append(f"Low pack voltage (R): {self.vesc_right.input_voltage_v:.2f} V")
 
         if self.gps_validity.cls in ("poor", "no_fix"):
             reasons.append(f"GPS validity: {self.gps_validity.cls} ({self.gps_validity.reason})")
@@ -450,6 +582,7 @@ class StatusBridge(Node):
                 "node": self.get_name(),
                 "time_unix": now_unix(),
                 "vesc_left": asdict(self.vesc_left),
+                "vesc_right": asdict(self.vesc_right),
                 "gps": asdict(self.gps),
                 "gps_sats": asdict(self.gps_sats),
                 "odometry_gps": asdict(self.odom_gps),
@@ -459,12 +592,164 @@ class StatusBridge(Node):
                 "gps_validity": asdict(self.gps_validity),
                 "topic_freshness": self._freshness_snapshot_locked(),
                 "health": asdict(self.compute_health_locked()),
+                "mission": self._mission_snapshot_locked(),
             }
+
+    def _mission_snapshot_locked(self) -> Dict[str, Any]:
+        m = self.mission
+        return {
+            "present":            m.present,
+            "origin_lat":         m.origin_lat,
+            "origin_lon":         m.origin_lon,
+            "nav_enabled":        m.nav_enabled,
+            "waypoints":          [{"lat": w.lat, "lon": w.lon, "name": w.name} for w in m.waypoints] if m.waypoints else [],
+            "pose_x":             m.pose_x,
+            "pose_y":             m.pose_y,
+            "pose_yaw_rad":       m.pose_yaw_rad,
+            "target_x":           m.target_x,
+            "target_y":           m.target_y,
+            "carrot_x":           m.carrot_x,
+            "carrot_y":           m.carrot_y,
+            "waypoint_index":     m.waypoint_index,
+            "mission_complete":   m.mission_complete,
+            "acceptance_radius_m": m.acceptance_radius_m,
+        }
 
     def costmap_snapshot(self, which: str) -> Dict[str, Any]:
         with self._lock:
             cm = self.costmap_local if which == "local" else self.costmap_global
             return asdict(cm)
+
+
+    # ---- Mission planner callbacks ----
+    def _on_nav_enabled_echo(self, msg: Bool) -> None:
+        with self._lock:
+            self.mission.nav_enabled = bool(msg.data)
+
+    def publish_nav_enabled(self, enabled: bool) -> None:
+        msg = Bool()
+        msg.data = enabled
+        self._nav_enabled_pub.publish(msg)
+        with self._lock:
+            self.mission.nav_enabled = enabled
+
+    def publish_cancel(self) -> None:
+        msg = Bool()
+        msg.data = True
+        self._cancel_pub.publish(msg)
+
+    def _on_mission_origin(self, msg: NavSatFix) -> None:
+        """Store the fixed mission origin from mission_global_frame_node."""
+        with self._lock:
+            self.mission.origin_lat = float(msg.latitude)
+            self.mission.origin_lon = float(msg.longitude)
+            self.mission.present = True
+
+    def _on_mission_waypoints_latlon(self, msg: String) -> None:
+        """Receive waypoints as JSON [{lat, lon, name}, ...] from the mission manager."""
+        import json
+        try:
+            data = json.loads(msg.data)
+            with self._lock:
+                self.mission.waypoints = [
+                    MissionWaypoint(
+                        lat=float(w['lat']),
+                        lon=float(w['lon']),
+                        name=str(w.get('name', f'wp_{i}'))
+                    )
+                    for i, w in enumerate(data)
+                ]
+                self.mission.present = True
+        except Exception as e:
+            self.get_logger().warn(f'Failed to parse waypoints_latlon: {e}')
+
+    def _on_mission_pose(self, msg: PoseStamped) -> None:
+        with self._lock:
+            self.mission.present = True
+            self.mission.pose_x = float(msg.pose.position.x)
+            self.mission.pose_y = float(msg.pose.position.y)
+            self.mission.pose_yaw_rad = yaw_from_quat(msg.pose.orientation)
+
+    def _on_mission_target(self, msg: PoseStamped) -> None:
+        with self._lock:
+            self.mission.present = True
+            self.mission.target_x = float(msg.pose.position.x)
+            self.mission.target_y = float(msg.pose.position.y)
+
+    def _on_mission_carrot(self, msg: PoseStamped) -> None:
+        with self._lock:
+            self.mission.present = True
+            self.mission.carrot_x = float(msg.pose.position.x)
+            self.mission.carrot_y = float(msg.pose.position.y)
+
+    def _on_mission_index(self, msg: Int32) -> None:
+        with self._lock:
+            self.mission.waypoint_index = int(msg.data)
+
+    def _on_mission_complete(self, msg: Bool) -> None:
+        with self._lock:
+            self.mission.mission_complete = bool(msg.data)
+
+    def publish_waypoints_latlon(self, waypoints_json: str) -> None:
+        """
+        Push a new waypoint list onto /mission/waypoints_latlon.
+        waypoints_json: JSON string — [{"lat": ..., "lon": ..., "name": ...}, ...]
+        """
+        msg = String()
+        msg.data = waypoints_json
+        self._waypoints_latlon_pub.publish(msg)
+
+    def get_waypoints_as_yaml(self) -> str:
+        """Return the current in-memory waypoints serialised as YAML (for download)."""
+        import yaml
+        with self._lock:
+            wps = self.mission.waypoints or []
+            data = {
+                'waypoints': [
+                    {'name': w.name, 'latitude': w.lat, 'longitude': w.lon, 'altitude': 0.0}
+                    for w in wps
+                ]
+            }
+        return yaml.dump(data, default_flow_style=False, sort_keys=False)
+
+    def set_mission_waypoints(self, waypoints: list) -> None:
+        """
+        waypoints: list of (lat, lon) or (lat, lon, name) tuples.
+        Called from main.py after loading the YAML file.
+        """
+        with self._lock:
+            self.mission.waypoints = [
+                MissionWaypoint(
+                    lat=float(w[0]),
+                    lon=float(w[1]),
+                    name=str(w[2]) if len(w) > 2 else f'wp_{i}'
+                )
+                for i, w in enumerate(waypoints)
+            ]
+            self.mission.acceptance_radius_m = self._mission_acceptance_radius_m
+
+
+    def call_trigger_service(self, service_name: str, timeout_sec: float = 3.0) -> Dict[str, Any]:
+        """
+        Synchronously call a std_srvs/Trigger service from the bridge node.
+        Returns {success: bool, message: str}.
+        """
+        from std_srvs.srv import Trigger
+        client = self.create_client(Trigger, service_name)
+        try:
+            if not client.wait_for_service(timeout_sec=timeout_sec):
+                return {"success": False, "message": f"Service {service_name} not available"}
+            future = client.call_async(Trigger.Request())
+            rclpy.spin_until_future_complete(self, future, timeout_sec=timeout_sec)
+            if future.done():
+                result = future.result()
+                return {"success": bool(result.success), "message": str(result.message)}
+            else:
+                return {"success": False, "message": f"Service {service_name} timed out"}
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+        finally:
+            self.destroy_client(client)
 
 
 def spin_ros(node: StatusBridge, num_threads: int = 2) -> None:

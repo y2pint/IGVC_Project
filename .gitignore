@@ -2,6 +2,7 @@ isaac_ros-dev/build
 isaac_ros-dev/install
 isaac_ros-dev/log
 isaac_ros-dev/isaac_ros_assets
+isaac_ros-dev/src/vehicle_control_unit/vehicle_control_unit/tiles
 
 __pycache__/
 *.pyc

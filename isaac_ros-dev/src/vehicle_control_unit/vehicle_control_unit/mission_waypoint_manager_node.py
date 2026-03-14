@@ -3,12 +3,15 @@
 import math
 import os
 import yaml
+import json
 from typing import List, Dict, Optional
 
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Int32, Bool
+from std_msgs.msg import Int32, Bool, String
 from std_srvs.srv import Trigger
+from rcl_interfaces.srv import SetParameters
+from rcl_interfaces.msg import Parameter, ParameterValue, ParameterType
 from sensor_msgs.msg import NavSatFix
 from geometry_msgs.msg import PoseStamped, PointStamped
 from visualization_msgs.msg import Marker, MarkerArray
@@ -36,6 +39,7 @@ class MissionWaypointManagerNode(Node):
         self.declare_parameter('pose_topic', '/mission/global_pose_xy')
         self.declare_parameter('origin_topic', '/mission/origin_fix')
         self.declare_parameter('target_topic', '/mission/current_waypoint_xy')
+        self.declare_parameter('waypoints_latlon_topic', '/mission/waypoints_latlon')
 
         self.waypoints_file = self.get_parameter('waypoints_file').get_parameter_value().string_value
         self.acceptance_radius_m = self.get_parameter('acceptance_radius_m').value
@@ -46,6 +50,7 @@ class MissionWaypointManagerNode(Node):
         self.pose_topic = self.get_parameter('pose_topic').value
         self.origin_topic = self.get_parameter('origin_topic').value
         self.target_topic = self.get_parameter('target_topic').value
+        self.waypoints_latlon_topic = self.get_parameter('waypoints_latlon_topic').value
 
         self.origin_lat = self.get_parameter('origin_latitude').value
         self.origin_lon = self.get_parameter('origin_longitude').value
@@ -81,12 +86,22 @@ class MissionWaypointManagerNode(Node):
             10
         )
 
+        # Subscribe to waypoints_latlon so the gateway (or any node) can push
+        # a new waypoint list at runtime without restarting this node.
+        self.waypoints_latlon_sub = self.create_subscription(
+            String,
+            self.waypoints_latlon_topic,
+            self._on_waypoints_latlon,
+            10
+        )
+
         # ----------------------------
         # Publishers
         # ----------------------------
         self.target_pub = self.create_publisher(PoseStamped, self.target_topic, 10)
         self.index_pub = self.create_publisher(Int32, '/mission/waypoint_index', 10)
         self.done_pub = self.create_publisher(Bool, '/mission/mission_complete', 10)
+        self.waypoints_latlon_pub = self.create_publisher(String, self.waypoints_latlon_topic, 10)
 
         self.active_wp_point_pub = self.create_publisher(PointStamped, '/mission/current_waypoint_point', 10)
 
@@ -100,6 +115,16 @@ class MissionWaypointManagerNode(Node):
         # ----------------------------
         self.next_srv = self.create_service(Trigger, '/mission/next_waypoint', self.next_waypoint_srv)
         self.reset_srv = self.create_service(Trigger, '/mission/reset_waypoints', self.reset_waypoints_srv)
+
+        # New: accept a JSON waypoint list from external callers (gateway, CLI, etc.)
+        # Uses Trigger-style but piggybacks the JSON via a parameter set before calling.
+        # Simpler approach: dedicated String-based service via rcl_interfaces SetParameters.
+        # We use a second Trigger + a shared _pending_waypoints_json slot, set via topic.
+        # → Actually: expose a clean service using a SetParameters-style approach.
+        #   The gateway will POST JSON → gateway publishes on waypoints_latlon_topic →
+        #   this node's _on_waypoints_latlon callback handles it directly.
+        #   Additionally expose /mission/save_waypoints Trigger to save current list to file.
+        self.save_srv = self.create_service(Trigger, '/mission/save_waypoints', self.save_waypoints_srv)
 
         # ----------------------------
         # Timer
@@ -139,8 +164,50 @@ class MissionWaypointManagerNode(Node):
     def pose_callback(self, msg: PoseStamped):
         self.current_pose_xy = msg
 
+    def _on_waypoints_latlon(self, msg: String) -> None:
+        """
+        Accept a new waypoint list pushed at runtime as JSON:
+          [{"lat": ..., "lon": ..., "name": ...}, ...]
+
+        This is the primary mechanism for the dashboard waypoint editor to
+        update the mission without restarting the node.  After parsing, we
+        immediately recompute local XY and reset the mission index to 0.
+        """
+        try:
+            data = json.loads(msg.data)
+            if not isinstance(data, list) or len(data) == 0:
+                self.get_logger().warn('waypoints_latlon: received empty or non-list payload, ignoring.')
+                return
+
+            new_raw = []
+            for i, w in enumerate(data):
+                if 'lat' not in w or 'lon' not in w:
+                    self.get_logger().warn(f'waypoints_latlon: item {i} missing lat/lon, skipping.')
+                    continue
+                new_raw.append({
+                    'name': str(w.get('name', f'wp_{i}')),
+                    'latitude': float(w['lat']),
+                    'longitude': float(w['lon']),
+                    'altitude': float(w.get('altitude', 0.0)),
+                })
+
+            if not new_raw:
+                self.get_logger().warn('waypoints_latlon: no valid waypoints after parsing.')
+                return
+
+            self.raw_waypoints = new_raw
+            self.current_index = 0
+            self.mission_complete = False
+            self.recompute_local_waypoints()
+            self.get_logger().info(
+                f'waypoints_latlon: loaded {len(self.raw_waypoints)} waypoints from topic.'
+            )
+        except Exception as e:
+            self.get_logger().error(f'waypoints_latlon: parse error: {e}')
+
     def timer_callback(self):
         self.publish_status()
+        self.publish_waypoints_latlon()
 
         if not self.local_waypoints:
             return
@@ -176,6 +243,47 @@ class MissionWaypointManagerNode(Node):
         response.success = True
         response.message = 'Waypoint sequence reset to index 0.'
         self.get_logger().info(response.message)
+        return response
+
+    def save_waypoints_srv(self, request, response):
+        """
+        Save the current in-memory waypoint list back to waypoints_file.
+        Called by the dashboard 'Save to file' button via the gateway.
+        """
+        del request
+        if not self.waypoints_file:
+            response.success = False
+            response.message = 'waypoints_file parameter is not set; cannot save.'
+            return response
+
+        if not self.raw_waypoints:
+            response.success = False
+            response.message = 'No waypoints in memory to save.'
+            return response
+
+        try:
+            data = {
+                'waypoints': [
+                    {
+                        'name': wp['name'],
+                        'latitude': wp['latitude'],
+                        'longitude': wp['longitude'],
+                        'altitude': wp['altitude'],
+                    }
+                    for wp in self.raw_waypoints
+                ]
+            }
+            with open(self.waypoints_file, 'w') as f:
+                yaml.dump(data, f, default_flow_style=False, sort_keys=False)
+
+            response.success = True
+            response.message = f'Saved {len(self.raw_waypoints)} waypoints to {self.waypoints_file}.'
+            self.get_logger().info(response.message)
+        except Exception as e:
+            response.success = False
+            response.message = f'Failed to save waypoints: {e}'
+            self.get_logger().error(response.message)
+
         return response
 
     # ==========================================================
@@ -313,6 +421,15 @@ class MissionWaypointManagerNode(Node):
         done_msg.data = self.mission_complete
         self.done_pub.publish(done_msg)
 
+    def publish_waypoints_latlon(self):
+        if not self.raw_waypoints:
+            return
+        payload = json.dumps([
+            {'lat': wp['latitude'], 'lon': wp['longitude'], 'name': wp['name']}
+            for wp in self.raw_waypoints
+        ])
+        self.waypoints_latlon_pub.publish(String(data=payload))
+
     def publish_active_waypoint(self):
         if not self.local_waypoints:
             return
@@ -428,12 +545,6 @@ class MissionWaypointManagerNode(Node):
     # ==========================================================
     @staticmethod
     def latlon_to_local_xy(lat_deg: float, lon_deg: float, lat0_deg: float, lon0_deg: float):
-        """
-        Local tangent-plane approximation:
-          x = East [m]
-          y = North [m]
-        Good for small mission areas like IGVC fields/courses.
-        """
         lat = math.radians(lat_deg)
         lon = math.radians(lon_deg)
         lat0 = math.radians(lat0_deg)

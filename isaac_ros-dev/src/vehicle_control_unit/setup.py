@@ -109,8 +109,11 @@ setup(
             # CARROT TARGET NODE
             'carrot_target_node = vehicle_control_unit.carrot_target_node:main',
 
-            # CARROT TARGET NODE
+            # carrot_to_nav2_action_node
             'carrot_to_nav2_action_node = vehicle_control_unit.carrot_to_nav2_action_node:main',
+
+            # map_odom_broadcaster_node
+            'map_odom_broadcaster = vehicle_control_unit.map_odom_broadcaster:main',
             
             
         ],

@@ -3,27 +3,46 @@ from launch.actions import IncludeLaunchDescription, TimerAction, ExecuteProcess
 from launch.launch_description_sources import AnyLaunchDescriptionSource
 from launch_ros.substitutions import FindPackageShare
 from launch.substitutions import PathJoinSubstitution
+from ament_index_python.packages import get_package_share_directory
+import os
+
 
 def generate_launch_description():
+
+    pluginlists_yaml = os.path.join(
+        get_package_share_directory('vehicle_control_unit'),
+        'config',
+        'mavros_plugins_rover.yaml'
+    )
+
+    config_yaml = os.path.join(
+        get_package_share_directory('mavros'),
+        'launch',
+        'apm_config.yaml'    # keep using the default config
+    )
 
     mavros_launch = IncludeLaunchDescription(
         AnyLaunchDescriptionSource(
             PathJoinSubstitution([
                 FindPackageShare('mavros'),
                 'launch',
-                'apm.launch'
+                'node.launch'       # call node.launch directly, not apm.launch
             ])
         ),
         launch_arguments={
             'fcu_url': 'serial:///dev/ttyTHS1:57600',
-            'time_sync': 'false',
+            'gcs_url': '',
+            'tgt_system': '1',
+            'tgt_component': '1',
+            'fcu_protocol': 'v2.0',
+            'respawn_mavros': 'false',
+            'pluginlists_yaml': pluginlists_yaml,  # now actually passed
+            'config_yaml': config_yaml,
         }.items()
     )
-
-    # IMPORTANT: use the fully-qualified service that exists in your graph
+    
     service_name = '/mavros/mavros/set_message_interval'
 
-    # GPS_RAW_INT (ID 24) -> /mavros/global_position/raw/*
     set_gps_raw_int = TimerAction(
         period=3.0,
         actions=[
@@ -39,7 +58,6 @@ def generate_launch_description():
         ]
     )
 
-    # GLOBAL_POSITION_INT (ID 33) -> /mavros/global_position/global
     set_global_position_int = TimerAction(
         period=3.5,
         actions=[
@@ -55,7 +73,6 @@ def generate_launch_description():
         ]
     )
 
-    # RC_CHANNELS (ID 65) -> /mavros/rc/in
     set_rc_channels = TimerAction(
         period=4.0,
         actions=[
