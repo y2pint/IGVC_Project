@@ -187,9 +187,18 @@ class VescErpmWheelOdom(Node):
         odom.pose.pose.orientation.z = qz
         odom.pose.pose.orientation.w = qw
 
+        # Pose covariance — x, y, yaw
+        odom.pose.covariance[0]  = 0.001   # x
+        odom.pose.covariance[7]  = 0.001   # y
+        odom.pose.covariance[35] = 0.05    # yaw — intentionally large, compass will correct this
+
         odom.twist.twist.linear.x = v
         odom.twist.twist.linear.y = 0.0
         odom.twist.twist.angular.z = wz
+        # Twist covariance — vx, yaw rate
+        odom.twist.covariance[0]  = 0.001  # vx
+        odom.twist.covariance[35] = 0.05   # yaw rate
+
 
         self.odom_pub.publish(odom)
 

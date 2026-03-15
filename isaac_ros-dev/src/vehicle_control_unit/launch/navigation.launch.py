@@ -286,6 +286,24 @@ def generate_launch_description() -> LaunchDescription:
         ),
     ]
 
+    actions += [
+        
+        _node(
+            package=pkg,
+            executable='compass_heading_publisher',
+            name='compass_heading_publisher',
+            params=[{
+                'mag_topic':      '/zed/zed_node/imu/mag',
+                'imu_topic':      '/zed/zed_node/imu/data',
+                'output_topic':   '/compass/pose',
+                'frame_id':       'odom',
+                'yaw_stdev_deg':  10.0,
+                'alpha':          0.05,
+                'deadband_deg':   10.0,
+            }],
+        ),
+    ]
+
     # ================================================================
     # LOCAL EKF  (always on)
     # fuses wheel odometry → publishes odom → base_link TF

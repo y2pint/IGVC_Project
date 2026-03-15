@@ -132,14 +132,14 @@ controller_server:
       ObstaclesCritic:
         enabled: true
         cost_power: 1
-        repulsion_weight: 4.0
+        repulsion_weight: 2.0         # was 4.0 — less repulsion
         critical_weight: 20.0
         consider_footprint: True
         collision_cost: 10000.0
-        collision_margin_distance: 0.15
+        collision_margin_distance: 0.10  # was 0.15 — tighter margin
         near_goal_distance: 0.5
-        inflation_radius: 0.8
-        cost_scaling_factor: 10.0
+        inflation_radius: 0.45        # was 0.80 — biggest change
+        cost_scaling_factor: 5.0      # was 10.0 — gentler falloff
       PathAlignCritic:
         enabled: true
         cost_power: 1
@@ -205,8 +205,8 @@ local_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         enabled: True
-        cost_scaling_factor: 10.0
-        inflation_radius: 0.50
+        cost_scaling_factor: 5.0      # was 10.0 — gentler falloff
+        inflation_radius: 0.35        # was 0.50 — tighter bubble
 
       nvblox_layer:
         plugin: "nvblox::nav2::NvbloxCostmapLayer"

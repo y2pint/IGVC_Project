@@ -12,68 +12,56 @@ ekf_local:
 
     predict_to_current_time: true
 
-    # --- Wheel Odometry ---
+    # ----------------------------------------------------------------
+    # Wheel Odometry
+    # Fuse: X, Y position | Yaw | Vx | Yaw rate
+    # ----------------------------------------------------------------
     odom0: /wheel/odom
     odom0_queue_size: 20
     odom0_differential: false
     odom0_relative: false
     odom0_config: [
-      true,  true,  false,
-      false, false, true,
-      true,  false, false,
-      false, false, true,
-      false, false, false
+      true,  true,  false,   # X, Y, Z
+      false, false, true,    # roll, pitch, yaw
+      true,  false, false,   # Vx, Vy, Vz
+      false, false, true,    # Vroll, Vpitch, Vyaw
+      false, false, false    # Ax, Ay, Az
     ]
 
-    # --- ZED2 IMU ---
+    # ----------------------------------------------------------------
+    # ZED2 IMU
+    # Fuse: Yaw rate only
+    # Skip absolute yaw — ZED VIO jumps, use compass for absolute ref
+    # Skip accelerations — Vx from wheel odom is cleaner
+    # ----------------------------------------------------------------
     imu0: /zed/zed_node/imu/data
     imu0_queue_size: 20
     imu0_differential: false
     imu0_relative: false
     imu0_remove_gravitational_acceleration: true
-
-    # Fuse:
-    # - orientation: only yaw (row 3, index 5)
-    # - angular velocity: only yaw rate (row 4, index 11)
-    # Skip roll/pitch — two_d_mode handles that
-    # Skip accelerations — wheel odom Vx is more reliable for a ground robot
-    imu0_config: [
-      false, false, false,
-      false, false, false,   # <-- changed: don't fuse absolute yaw
-      false, false, false,
-      false, false, true,    # <-- keep: fuse yaw rate only
-      false, false, false
-    ]
-
     imu0_nodelay: true
     imu0_throttle_config: false
+    imu0_config: [
+      false, false, false,   # X, Y, Z
+      false, false, false,   # roll, pitch, yaw — skip absolute
+      false, false, false,   # Vx, Vy, Vz
+      false, false, true,    # Vroll, Vpitch, Vyaw rate only
+      false, false, false    # Ax, Ay, Az
+    ]
 
-
-
-# BACKUP
-# ekf_local:
-#   ros__parameters:
-#     frequency: 30.0
-#     sensor_timeout: 0.2
-#     two_d_mode: true
-
-#     publish_tf: true
-#     map_frame: map
-#     odom_frame: odom
-#     base_link_frame: base_link
-#     world_frame: odom
-
-#     predict_to_current_time: true
-
-#     odom0: /wheel/odom
-#     odom0_queue_size: 20
-#     odom0_differential: false
-#     odom0_relative: false
-
-#     odom0_config: [
-#       true,  true,  false,
-#       false, false, true,
-#       true,  false, false,
-#       false, false, true,
-#       false, false, false
-#     ]
+    # ----------------------------------------------------------------
+    # ZED2 Magnetometer (via compass_heading_publisher node)
+    # Absolute yaw reference — heavily filtered to prevent jerk
+    # yaw_stdev_deg: 8.0, alpha: 0.03 in compass_heading_publisher
+    # ----------------------------------------------------------------
+    # pose0: /compass/pose
+    # pose0_queue_size: 10
+    # pose0_differential: false
+    # pose0_relative: false
+    # pose0_config: [
+    #   false, false, false,   # X, Y, Z
+    #   false, false, true,    # roll, pitch, yaw only
+    #   false, false, false,   # Vx, Vy, Vz
+    #   false, false, false,   # Vroll, Vpitch, Vyaw
+    #   false, false, false    # Ax, Ay, Az
+    # ]

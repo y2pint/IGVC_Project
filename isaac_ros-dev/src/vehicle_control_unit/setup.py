@@ -114,7 +114,9 @@ setup(
 
             # map_odom_broadcaster_node
             'map_odom_broadcaster = vehicle_control_unit.map_odom_broadcaster:main',
-            
+
+            #compass_heading_publisher
+            'compass_heading_publisher = vehicle_control_unit.compass_heading_publisher:main',
             
         ],
     },
