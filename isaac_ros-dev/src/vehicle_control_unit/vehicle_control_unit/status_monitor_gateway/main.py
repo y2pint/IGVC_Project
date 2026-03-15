@@ -24,7 +24,7 @@ def main() -> None:
     rclpy.init()
     _bridge = StatusBridge()
 
-    t = threading.Thread(target=spin_ros, args=(_bridge, 2), daemon=True)
+    t = threading.Thread(target=spin_ros, args=(_bridge, 4), daemon=True)
     t.start()
 
     app = create_app(_get_bridge)

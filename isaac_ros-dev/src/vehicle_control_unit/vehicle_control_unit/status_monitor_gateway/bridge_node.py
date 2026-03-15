@@ -11,11 +11,11 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.qos import QoSProfile
 
 from sensor_msgs.msg import NavSatFix
-from nav_msgs.msg import Odometry, OccupancyGrid
+from nav_msgs.msg import Odometry, OccupancyGrid, Path
 from action_msgs.msg import GoalStatusArray
 from tf2_ros import Buffer, TransformListener
 from std_msgs.msg import Float32, Float64, Int32, UInt32, Bool, String
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Twist
 
 from .qos import qos_reliable, qos_sensor
 from .utils import now_unix, clamp, yaw_from_quat
@@ -23,6 +23,7 @@ from .models import (
     TopicFreshness, VescSnapshot, GPSSnapshot, SatSnapshot,
     OdomGpsSnapshot, LocalizationSnapshot, NavSnapshot,
     TFHealth, GPSValidity, CostmapSnapshot, HealthSummary, MissionSnapshot, MissionWaypoint,
+    PathSnapshot, CmdVelSnapshot,
 )
 
 
@@ -46,6 +47,8 @@ class StatusBridge(Node):
         self.declare_parameter("nav_status_topic", "/navigate_to_pose/_action/status")
         self.declare_parameter("local_costmap_topic", "/local_costmap/costmap")
         self.declare_parameter("global_costmap_topic", "/global_costmap/costmap")
+        self.declare_parameter("plan_topic", "/plan")
+        self.declare_parameter("cmd_vel_topic", "/cmd_vel")
 
         # Mission planner topics
         self.declare_parameter("mission_pose_topic",              "/mission/global_pose_xy")
@@ -74,6 +77,8 @@ class StatusBridge(Node):
         nav_status_topic = self.get_parameter("nav_status_topic").value
         local_costmap_topic = self.get_parameter("local_costmap_topic").value
         global_costmap_topic = self.get_parameter("global_costmap_topic").value
+        plan_topic = self.get_parameter("plan_topic").value
+        cmd_vel_topic = self.get_parameter("cmd_vel_topic").value
 
         mission_pose_topic    = self.get_parameter("mission_pose_topic").value
         mission_target_topic  = self.get_parameter("mission_target_topic").value
@@ -102,6 +107,9 @@ class StatusBridge(Node):
         self.costmap_local = CostmapSnapshot()
         self.costmap_global = CostmapSnapshot()
 
+        self.nav_path = PathSnapshot()
+        self.cmd_vel = CmdVelSnapshot()
+
         self.mission = MissionSnapshot()
 
         # Publishers for mission control
@@ -123,6 +131,8 @@ class StatusBridge(Node):
             "vesc_right": TopicFreshness(),
             "costmap_local": TopicFreshness(),
             "costmap_global": TopicFreshness(),
+            "nav_path": TopicFreshness(),
+            "cmd_vel": TopicFreshness(),
         }
 
         # -------------------------
@@ -188,6 +198,12 @@ class StatusBridge(Node):
         # -------------------------
         self.create_subscription(OccupancyGrid, local_costmap_topic, self._on_costmap_local, qos_sensor)
         self.create_subscription(OccupancyGrid, global_costmap_topic, self._on_costmap_global, qos_sensor)
+
+        # -------------------------
+        # Nav2 planned path and velocity command
+        # -------------------------
+        self.create_subscription(Path, plan_topic, self._on_nav_path, qos_sensor)
+        self.create_subscription(Twist, cmd_vel_topic, self._on_cmd_vel, qos_reliable)
 
         # -------------------------
         # Mission planner topics
@@ -457,6 +473,40 @@ class StatusBridge(Node):
             self.topic_fresh["costmap_global"].touch(t)
             self.costmap_global = self.render_costmap_downsample(msg, max_dim=240)
 
+    def _on_nav_path(self, msg: Path):
+        """Downsample the Nav2 planned path to at most 200 points for the browser."""
+        t = now_unix()
+        poses_full = msg.poses
+        n = len(poses_full)
+        # Keep every k-th pose so the browser receives ≤200 points
+        k = max(1, n // 200)
+        sampled = [[p.pose.position.x, p.pose.position.y]
+                   for p in poses_full[::k]]
+        # Always include the last point
+        if n > 0 and (n - 1) % k != 0:
+            last = poses_full[-1]
+            sampled.append([last.pose.position.x, last.pose.position.y])
+        with self._lock:
+            self.topic_fresh["nav_path"].touch(t)
+            self.nav_path = PathSnapshot(
+                present=True,
+                stamp_unix=t,
+                frame_id=msg.header.frame_id,
+                poses=sampled,
+            )
+
+    def _on_cmd_vel(self, msg: Twist):
+        t = now_unix()
+        with self._lock:
+            self.topic_fresh["cmd_vel"].touch(t)
+            self.cmd_vel = CmdVelSnapshot(
+                present=True,
+                stamp_unix=t,
+                linear_x=float(msg.linear.x),
+                linear_y=float(msg.linear.y),
+                angular_z=float(msg.angular.z),
+            )
+
     # ---- TF ----
     def _check_tf_one(self, parent: str, child: str) -> Tuple[bool, str]:
         try:
@@ -593,6 +643,8 @@ class StatusBridge(Node):
                 "topic_freshness": self._freshness_snapshot_locked(),
                 "health": asdict(self.compute_health_locked()),
                 "mission": self._mission_snapshot_locked(),
+                "nav_path": asdict(self.nav_path),
+                "cmd_vel": asdict(self.cmd_vel),
             }
 
     def _mission_snapshot_locked(self) -> Dict[str, Any]:
@@ -731,28 +783,47 @@ class StatusBridge(Node):
 
     def call_trigger_service(self, service_name: str, timeout_sec: float = 3.0) -> Dict[str, Any]:
         """
-        Synchronously call a std_srvs/Trigger service from the bridge node.
+        Synchronously call a std_srvs/Trigger service from a thread outside the executor.
         Returns {success: bool, message: str}.
+
+        IMPORTANT: Do NOT call rclpy.spin_until_future_complete(self, ...) here, and
+        do NOT add this node to a second executor. The node is already owned and spun
+        by the MultiThreadedExecutor in spin_ros(). Adding it to a second executor or
+        calling spin_until_future_complete on it raises:
+            "Cannot use destroyable because it was requested"
+        and stalls the main executor, stopping costmap/map callbacks.
+
+        The correct approach: fire call_async() and simply poll the future's done()
+        flag from this (FastAPI) thread.  The MultiThreadedExecutor is already running
+        on its own threads and will drive the response callback automatically.
         """
         from std_srvs.srv import Trigger
+
         client = self.create_client(Trigger, service_name)
         try:
             if not client.wait_for_service(timeout_sec=timeout_sec):
                 return {"success": False, "message": f"Service {service_name} not available"}
+
             future = client.call_async(Trigger.Request())
-            rclpy.spin_until_future_complete(self, future, timeout_sec=timeout_sec)
-            if future.done():
-                result = future.result()
-                return {"success": bool(result.success), "message": str(result.message)}
-            else:
-                return {"success": False, "message": f"Service {service_name} timed out"}
+
+            # Poll until done — the MultiThreadedExecutor resolves the future in the
+            # background without any interference from this thread.
+            import time
+            deadline = time.monotonic() + timeout_sec
+            while not future.done():
+                if time.monotonic() >= deadline:
+                    return {"success": False, "message": f"Service {service_name} timed out"}
+                time.sleep(0.01)
+
+            result = future.result()
+            return {"success": bool(result.success), "message": str(result.message)}
         except Exception as e:
             return {"success": False, "message": str(e)}
         finally:
             self.destroy_client(client)
 
 
-def spin_ros(node: StatusBridge, num_threads: int = 2) -> None:
+def spin_ros(node: StatusBridge, num_threads: int = 4) -> None:
     executor = MultiThreadedExecutor(num_threads=num_threads)
     executor.add_node(node)
     try:

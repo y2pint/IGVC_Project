@@ -1005,10 +1005,124 @@ function drawGoalPose() {{
   ctx.restore();
 }}
 
+function drawNavPath() {{
+  if (!statusData || !statusData.nav_path) return;
+  const path = statusData.nav_path;
+  if (!path.present || !path.poses || path.poses.length < 2) return;
+
+  // Fade out stale paths (older than 2 s)
+  const age = statusData.time_unix - path.stamp_unix;
+  const alpha = age > 2.0 ? 0.15 : 0.80;
+
+  ctx.save();
+  ctx.strokeStyle = `rgba(34, 180, 34, ${{alpha}})`;
+  ctx.lineWidth = 2;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  const [sx, sy] = worldToCanvas(path.poses[0][0], path.poses[0][1]);
+  ctx.moveTo(sx, sy);
+  for (let i = 1; i < path.poses.length; i++) {{
+    const [px, py] = worldToCanvas(path.poses[i][0], path.poses[i][1]);
+    ctx.lineTo(px, py);
+  }}
+  ctx.stroke();
+
+  // Dot at the goal end of the path
+  const last = path.poses[path.poses.length - 1];
+  const [lx, ly] = worldToCanvas(last[0], last[1]);
+  ctx.fillStyle = `rgba(34, 180, 34, ${{alpha}})`;
+  ctx.beginPath();
+  ctx.arc(lx, ly, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}}
+
+function drawCmdVel() {{
+  if (!statusData || !statusData.cmd_vel) return;
+  const cv = statusData.cmd_vel;
+  if (!cv.present) return;
+
+  // Fade out stale cmd_vel (older than 0.5 s — controller should be publishing at ~10 Hz)
+  const age = statusData.time_unix - cv.stamp_unix;
+  if (age > 1.5) return;
+
+  if (!statusData.localization) return;
+  const loc = statusData.localization;
+  const rx = safeNum(loc.x);
+  const ry = safeNum(loc.y);
+  const ryaw = safeNum(loc.yaw_rad);
+  if (rx === null || ry === null || ryaw === null) return;
+
+  const [cx, cy] = worldToCanvas(rx, ry);
+
+  // Scale: map 1 m/s → 40 px arrow length
+  const SCALE_LIN = 40;
+  const SCALE_ANG = 30;
+
+  // Linear velocity arrow (world-frame: rotate by robot yaw)
+  const vx = cv.linear_x * Math.cos(ryaw) - cv.linear_y * Math.sin(ryaw);
+  const vy = cv.linear_x * Math.sin(ryaw) + cv.linear_y * Math.cos(ryaw);
+
+  const tip_cx = cx + vx * SCALE_LIN;
+  const tip_cy = cy - vy * SCALE_LIN;   // canvas Y is flipped
+
+  const speed = Math.sqrt(cv.linear_x**2 + cv.linear_y**2);
+  const alpha = Math.min(1.0, 0.4 + speed * 0.6);
+
+  ctx.save();
+  ctx.strokeStyle = `rgba(255, 140, 0, ${{alpha}})`;
+  ctx.fillStyle   = `rgba(255, 140, 0, ${{alpha}})`;
+  ctx.lineWidth = 3;
+
+  if (speed > 0.02) {{
+    // Shaft
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(tip_cx, tip_cy);
+    ctx.stroke();
+
+    // Arrowhead
+    const angle = Math.atan2(tip_cy - cy, tip_cx - cx);
+    const hs = 10;
+    ctx.beginPath();
+    ctx.moveTo(tip_cx, tip_cy);
+    ctx.lineTo(tip_cx - hs * Math.cos(angle - 0.4), tip_cy - hs * Math.sin(angle - 0.4));
+    ctx.lineTo(tip_cx - hs * Math.cos(angle + 0.4), tip_cy - hs * Math.sin(angle + 0.4));
+    ctx.closePath();
+    ctx.fill();
+  }}
+
+  // Angular velocity arc (clockwise arc on canvas when turning right)
+  if (Math.abs(cv.angular_z) > 0.02) {{
+    const arcR = 20;
+    const arcAlpha = Math.min(1.0, Math.abs(cv.angular_z) * 0.8);
+    ctx.strokeStyle = `rgba(255, 200, 0, ${{arcAlpha}})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    // In ROS: positive angular_z = turn left (counter-clockwise in world)
+    // Canvas: positive y is down, so CCW in world = CW on canvas
+    const startAngle = -ryaw;
+    const sweep = -cv.angular_z * 0.8;   // scale to visible arc
+    ctx.arc(cx, cy, arcR, startAngle, startAngle + sweep, cv.angular_z > 0);
+    ctx.stroke();
+  }}
+
+  // Label
+  ctx.font = "11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+  ctx.fillStyle = "rgba(200, 100, 0, 0.9)";
+  ctx.fillText(
+    `v=${{cv.linear_x.toFixed(2)}}m/s ω=${{cv.angular_z.toFixed(2)}}r/s`,
+    cx + 14, cy + 20
+  );
+  ctx.restore();
+}}
+
 function drawNavView() {{
   resizeCanvas();
   drawCostmap();
+  drawNavPath();
   drawRobotPose();
+  drawCmdVel();
   drawGoalPose();
 
    // Debug overlay (top-left)

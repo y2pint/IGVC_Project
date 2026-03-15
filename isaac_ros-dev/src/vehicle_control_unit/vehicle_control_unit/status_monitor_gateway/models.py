@@ -138,6 +138,24 @@ class CostmapSnapshot:
 
 
 @dataclass
+class PathSnapshot:
+    present: bool = False
+    stamp_unix: float = 0.0
+    frame_id: Optional[str] = None
+    # Downsampled list of [x, y] waypoints along the path
+    poses: Optional[List[List[float]]] = None   # [[x0,y0], [x1,y1], ...]
+
+
+@dataclass
+class CmdVelSnapshot:
+    present: bool = False
+    stamp_unix: float = 0.0
+    linear_x: float = 0.0   # m/s  (forward)
+    linear_y: float = 0.0   # m/s  (strafe, usually 0 for diff-drive)
+    angular_z: float = 0.0  # rad/s (yaw rate)
+
+
+@dataclass
 class HealthSummary:
     ok: bool = False
     reasons: list[str] = None

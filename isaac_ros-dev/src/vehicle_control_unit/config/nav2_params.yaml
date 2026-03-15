@@ -90,9 +90,9 @@ controller_server:
       model_dt: 0.1
       batch_size: 400
       vx_std: 0.3
-      wz_std: 0.3
-      vx_max: 1.0
-      vx_min: -1.0
+      wz_std: 0.1
+      vx_max: 2.0
+      vx_min: -0.5
       wz_max: 1.0
       iteration_count: 1
       prune_distance: 1.7
@@ -100,7 +100,7 @@ controller_server:
       temperature: 0.3
       gamma: 0.015
       motion_model: "DiffDrive"  # Ackermann
-      visualize: false
+      visualize: true
       reset_period: 1.0
       regenerate_noises: false
       # 🔽 Added minimum turning radius support
