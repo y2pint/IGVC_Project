@@ -52,9 +52,9 @@ class CarrotToNav2ActionNode(Node):
         self.declare_parameter('enable_topic', '/mission/navigation_enabled')
         self.declare_parameter('cancel_topic', '/mission/cancel_nav_goal')
 
-        self.declare_parameter('timer_rate_hz', 0.5)
-        self.declare_parameter('min_goal_shift_m', 1.5)
-        self.declare_parameter('min_goal_yaw_shift_rad', 0.4)
+        self.declare_parameter('timer_rate_hz', 2.0)              # was 0.5
+        self.declare_parameter('min_goal_shift_m', 0.5)           # was 1.5
+        self.declare_parameter('min_goal_yaw_shift_rad', 0.2)     # was 0.4
         self.declare_parameter('use_pointing_yaw', True)
         self.declare_parameter('allow_preemption', True)
 
@@ -162,7 +162,6 @@ class CarrotToNav2ActionNode(Node):
     def cancel_cb(self, msg: Bool) -> None:
         if not msg.data:
             return
-
         self.get_logger().warn('External cancel requested')
         self.pending_goal = None
         self.pending_goal_seq = None

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional, List
 
 
@@ -55,7 +55,6 @@ class GPSSnapshot:
     cov_xx: Optional[float] = None
     cov_yy: Optional[float] = None
     cov_zz: Optional[float] = None
-    compass_hdg_deg: Optional[float] = None  # degrees, 0=North, 90=East
 
 
 @dataclass
@@ -111,7 +110,7 @@ class TFHealth:
 
 @dataclass
 class GPSValidity:
-    cls: str = "unknown"   # no_fix | poor | degraded | good | unknown
+    cls: str = "unknown"
     reason: str = "unknown"
     age_sec: Optional[float] = None
     sats: Optional[int] = None
@@ -123,36 +122,15 @@ class CostmapSnapshot:
     present: bool = False
     stamp_unix: float = 0.0
     frame_id: Optional[str] = None
-
     resolution: Optional[float] = None
     width: Optional[int] = None
     height: Optional[int] = None
-
     origin_x: Optional[float] = None
     origin_y: Optional[float] = None
-
     ds: int = 1
     render_w: int = 0
     render_h: int = 0
     gray: Optional[List[int]] = None
-
-
-@dataclass
-class PathSnapshot:
-    present: bool = False
-    stamp_unix: float = 0.0
-    frame_id: Optional[str] = None
-    # Downsampled list of [x, y] waypoints along the path
-    poses: Optional[List[List[float]]] = None   # [[x0,y0], [x1,y1], ...]
-
-
-@dataclass
-class CmdVelSnapshot:
-    present: bool = False
-    stamp_unix: float = 0.0
-    linear_x: float = 0.0   # m/s  (forward)
-    linear_y: float = 0.0   # m/s  (strafe, usually 0 for diff-drive)
-    angular_z: float = 0.0  # rad/s (yaw rate)
 
 
 @dataclass
@@ -171,9 +149,9 @@ class MissionWaypoint:
 @dataclass
 class MissionSnapshot:
     present: bool = False
-    origin_lat: Optional[float] = None   # from /mission/origin_fix — fixed projection anchor
+    origin_lat: Optional[float] = None
     origin_lon: Optional[float] = None
-    nav_enabled: bool = False            # mirrors /mission/navigation_enabled
+    nav_enabled: bool = False
     waypoints: Optional[List[MissionWaypoint]] = None
     pose_x: Optional[float] = None
     pose_y: Optional[float] = None
@@ -185,3 +163,58 @@ class MissionSnapshot:
     waypoint_index: Optional[int] = None
     mission_complete: bool = False
     acceptance_radius_m: float = 2.5
+
+
+# ── NEW: BT Snapshot ──────────────────────────────────────────────────────────
+@dataclass
+class BTNodeEvent:
+    node_name: str = ""
+    previous_status: str = ""
+    current_status: str = ""
+    stamp_unix: float = 0.0
+
+
+@dataclass
+class BTSnapshot:
+    present: bool = False
+    stamp_unix: float = 0.0
+    last_events: List[BTNodeEvent] = field(default_factory=list)
+    recovery_active: bool = False
+    follow_path_status: str = "unknown"
+    compute_path_status: str = "unknown"
+    recovery_count: int = 0
+
+
+# ── NEW: cmd_vel Snapshot ─────────────────────────────────────────────────────
+@dataclass
+class CmdVelSnapshot:
+    present: bool = False
+    stamp_unix: float = 0.0
+    vx: Optional[float] = None
+    vy: Optional[float] = None
+    wz: Optional[float] = None
+
+
+# ── NEW: MAVROS / ArduPilot Snapshot ─────────────────────────────────────────
+@dataclass
+class MavrosSnapshot:
+    present: bool = False
+    stamp_unix: float = 0.0
+    connected: bool = False
+    armed: bool = False
+    mode: str = "unknown"
+    system_status: str = "unknown"
+    battery_voltage: Optional[float] = None
+    battery_current: Optional[float] = None
+    battery_remaining: Optional[float] = None
+
+
+# ── NEW: Path Snapshot ────────────────────────────────────────────────────────
+@dataclass
+class PathSnapshot:
+    present: bool = False
+    stamp_unix: float = 0.0
+    frame_id: str = ""
+    # Downsampled path points as flat [x0,y0, x1,y1, ...] for JSON efficiency
+    points_xy: Optional[List[float]] = None
+    point_count: int = 0

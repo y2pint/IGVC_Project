@@ -6,6 +6,7 @@ bt_navigator:
     bt_loop_duration: 10
     default_server_timeout: 20
     navigators: ['navigate_to_pose', 'navigate_through_poses']
+    default_nav_to_pose_bt_xml: "/workspaces/isaac_ros-dev/src/vehicle_control_unit/config/igvc_bt.xml"
     navigate_to_pose:
       plugin: "nav2_bt_navigator/NavigateToPoseNavigator"
     navigate_through_poses:
@@ -86,24 +87,23 @@ controller_server:
       stateful: false
     FollowPath:
       plugin: "nav2_mppi_controller::MPPIController"
-      time_steps: 25
+      time_steps: 40          # 4 second horizon
       model_dt: 0.1
-      batch_size: 400
-      vx_std: 0.3
-      wz_std: 0.1
-      vx_max: 2.0
+      batch_size: 2000        # good for AGX Orin
+      vx_std: 0.5
+      wz_std: 0.4             # was 0.1 — more steering exploration
+      vx_max: 1.0             # matched to velocity_smoother
       vx_min: -0.5
-      wz_max: 1.0
-      iteration_count: 1
-      prune_distance: 1.7
+      wz_max: 1.5             # matched to velocity_smoother
+      iteration_count: 3      # was 1 — smoother convergence
+      prune_distance: 3.0     # was 1.7 — less aggressive pruning
       transform_tolerance: 0.3
       temperature: 0.3
       gamma: 0.015
-      motion_model: "DiffDrive"  # Ackermann
+      motion_model: "DiffDrive"
       visualize: true
-      reset_period: 1.0
-      regenerate_noises: false
-      # 🔽 Added minimum turning radius support
+      reset_period: 2.0
+      regenerate_noises: true
       min_turning_radius: 0.5
       enable_min_turning_radius: false
       TrajectoryVisualizer:
@@ -122,28 +122,28 @@ controller_server:
       GoalAngleCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 10.0
-        threshold_to_consider: 0.5
+        cost_weight: 3.0
+        threshold_to_consider: 0.3
       PreferForwardCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 20.0 #0711 Add
+        cost_weight: 5.0
         threshold_to_consider: 0.5
       ObstaclesCritic:
         enabled: true
         cost_power: 1
-        repulsion_weight: 2.0         # was 4.0 — less repulsion
-        critical_weight: 20.0
+        repulsion_weight: 2.0
+        critical_weight: 10.0
         consider_footprint: True
         collision_cost: 10000.0
-        collision_margin_distance: 0.10  # was 0.15 — tighter margin
+        collision_margin_distance: 0.10
         near_goal_distance: 0.5
-        inflation_radius: 0.45        # was 0.80 — biggest change
-        cost_scaling_factor: 5.0      # was 10.0 — gentler falloff
+        inflation_radius: 0.45
+        cost_scaling_factor: 5.0
       PathAlignCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 14.0
+        cost_weight: 4.0
         max_path_occupancy_ratio: 0.05
         trajectory_point_step: 3
         threshold_to_consider: 0.5
@@ -152,13 +152,13 @@ controller_server:
       PathFollowCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 5.0
+        cost_weight: 8.0
         offset_from_furthest: 5
         threshold_to_consider: 1.4
       PathAngleCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 2.0
+        cost_weight: 4.0
         offset_from_furthest: 4
         threshold_to_consider: 0.5
         max_angle_to_furthest: 1.0
@@ -181,32 +181,20 @@ local_costmap:
       mark_threshold: 2
       always_send_full_costmap: True
       plugins: ['nvblox_layer', 'lane_layer', 'inflation_layer']
-      # plugins: ['obstacle_layer', 'nvblox_layer', 'lane_layer', 'inflation_layer']
 
       lane_layer:
         plugin: "lane_costmap_layer/LaneCostmapLayer"
         enabled: True
-        lane_topic: "/lane/occupancy_grid"      # your publisher topic
-        lane_threshold: 50            # occ >= 50 means "lane boundary"
-        lane_cost: 254                # LETHAL_OBSTACLE
-        use_maximum: True             # never overwrite NVBlox / laser obstacles
-
-      # obstacle_layer:
-      #   plugin: "nav2_costmap_2d::ObstacleLayer"
-      #   enabled: True
-      #   observation_sources: laser_scan_sensor
-      #   laser_scan_sensor:
-      #     topic: /scan
-      #     max_obstacle_height: 2.0
-      #     clearing: True
-      #     marking: True
-      #     data_type: LaserScan
+        lane_topic: "/lane/occupancy_grid"
+        lane_threshold: 50
+        lane_cost: 254
+        use_maximum: True
 
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         enabled: True
-        cost_scaling_factor: 5.0      # was 10.0 — gentler falloff
-        inflation_radius: 0.35        # was 0.50 — tighter bubble
+        cost_scaling_factor: 5.0
+        inflation_radius: 0.35
 
       nvblox_layer:
         plugin: "nvblox::nav2::NvbloxCostmapLayer"
@@ -236,28 +224,7 @@ global_costmap:
       track_unknown_space: False
       mark_threshold: 2
       always_send_full_costmap: False
-
       plugins: ['nvblox_layer', 'inflation_layer']
-      # plugins: ['obstacle_layer', 'nvblox_layer', 'lane_layer', 'inflation_layer']
-
-      # lane_layer:
-      #   plugin: "lane_costmap_layer/LaneCostmapLayer"
-      #   enabled: True
-      #   lane_topic: "/lane/occupancy_grid"  # (recommended) separate topic for map-frame lane
-      #   lane_threshold: 50
-      #   lane_cost: 254
-      #   use_maximum: True
-
-      # obstacle_layer:
-      #   plugin: "nav2_costmap_2d::ObstacleLayer"
-      #   enabled: True
-      #   observation_sources: laser_scan_sensor
-      #   laser_scan_sensor:
-      #     topic: /scan
-      #     max_obstacle_height: 2.0
-      #     clearing: True
-      #     marking: True
-      #     data_type: LaserScan
 
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
@@ -279,4 +246,45 @@ map_server:
     use_sim_time: False
     yaml_filename: ""
 
-# (Skipping the rest of parameters like behavior_server, smoother_server, etc for now since they were OK)
+behavior_server:
+  ros__parameters:
+    behavior_plugins: ["spin", "backup", "drive_on_heading", "wait"]
+    spin:
+      plugin: "nav2_behaviors/Spin"
+    backup:
+      plugin: "nav2_behaviors/BackUp"
+      acceleration_limit: 0.5
+      deceleration_limit: 1.0
+      minimum_speed: 0.02
+    drive_on_heading:
+      plugin: "nav2_behaviors/DriveOnHeading"
+      acceleration_limit: 0.5
+      deceleration_limit: 1.0
+      minimum_speed: 0.02
+    wait:
+      plugin: "nav2_behaviors/Wait"
+    costmap_topic: local_costmap/costmap_raw
+    footprint_topic: local_costmap/published_footprint
+    global_frame: odom
+    robot_base_frame: base_link
+    transform_tolerance: 0.1
+    cycle_frequency: 10.0
+    max_rotational_vel: 1.0
+    min_rotational_vel: 0.2
+    rotational_acc_lim: 1.0
+    simulate_ahead_time: 2.0
+    use_sim_time: False
+
+velocity_smoother:
+  ros__parameters:
+    smoothing_frequency: 50.0
+    scale_velocities: false
+    feedback: OPEN_LOOP
+    max_velocity: [1.0, 0.0, 1.5]
+    min_velocity: [-0.5, 0.0, -1.5]
+    max_accel: [0.4, 0.0, 1.0]
+    max_decel: [-0.6, 0.0, -1.5]
+    odom_topic: odom
+    odom_duration: 0.1
+    deadband_velocity: [0.0, 0.0, 0.0]
+    velocity_timeout: 1.0

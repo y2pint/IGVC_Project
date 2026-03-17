@@ -1,0 +1,45 @@
+<!--
+  IGVC Custom Behavior Tree
+  - No RateController: replanning driven by carrot_to_nav2_action_node (2 Hz)
+  - No Wait recovery: too long for dynamic navigation
+  - Recovery: BackUp + alternating small turns + replan
+  - 3 retries before abort
+-->
+<root main_tree_to_execute="MainTree">
+  <BehaviorTree ID="MainTree">
+    <RecoveryNode number_of_retries="3" name="NavigateRecovery">
+      <PipelineSequence name="NavigateWithReplanning">
+
+        <RecoveryNode number_of_retries="1" name="ComputePathToPose">
+          <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>
+          <ClearEntireCostmap name="ClearGlobalCostmap-Context"
+            service_name="global_costmap/clear_entirely_global_costmap"/>
+        </RecoveryNode>
+
+        <RecoveryNode number_of_retries="1" name="FollowPath">
+          <FollowPath path="{path}" controller_id="FollowPath"/>
+          <ClearEntireCostmap name="ClearLocalCostmap-Context"
+            service_name="local_costmap/clear_entirely_local_costmap"/>
+        </RecoveryNode>
+
+      </PipelineSequence>
+
+      <ReactiveFallback name="RecoveryFallback">
+        <GoalUpdated/>
+        <Sequence name="RecoverySequence">
+          <ClearEntireCostmap name="ClearLocalCostmap-Recovery"
+            service_name="local_costmap/clear_entirely_local_costmap"/>
+          <ClearEntireCostmap name="ClearGlobalCostmap-Recovery"
+            service_name="global_costmap/clear_entirely_global_costmap"/>
+          <BackUp backup_dist="0.5" backup_speed="0.05"/>
+          <RoundRobin name="AlternatingTurns">
+            <Spin spin_dist="0.26"/>   <!-- left  15° -->
+            <Spin spin_dist="-0.26"/>  <!-- right 15° -->
+            <Spin spin_dist="0.52"/>   <!-- left  30° -->
+          </RoundRobin>
+        </Sequence>
+      </ReactiveFallback>
+
+    </RecoveryNode>
+  </BehaviorTree>
+</root>
