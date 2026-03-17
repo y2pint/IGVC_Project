@@ -107,20 +107,20 @@ def add_nvblox(args: lu.ArgumentContainer) -> List[Action]:
     if camera == NvbloxCamera.realsense:
         assert args.num_cameras == 1, 'NvbloxCamera.realsense shall only be set for num_cameras==1'
 
-    base_config = lu.get_path('nvblox_examples_bringup', 'config/nvblox/nvblox_base.yaml')
-    segmentation_config = lu.get_path('nvblox_examples_bringup',
+    base_config = lu.get_path('vehicle_control_unit', 'config/nvblox/nvblox_base.yaml')
+    segmentation_config = lu.get_path('vehicle_control_unit',
                                       'config/nvblox/specializations/nvblox_segmentation.yaml')
-    detection_config = lu.get_path('nvblox_examples_bringup',
+    detection_config = lu.get_path('vehicle_control_unit',
                                    'config/nvblox/specializations/nvblox_detection.yaml')
-    dynamics_config = lu.get_path('nvblox_examples_bringup',
+    dynamics_config = lu.get_path('vehicle_control_unit',
                                   'config/nvblox/specializations/nvblox_dynamics.yaml')
-    isaac_sim_config = lu.get_path('nvblox_examples_bringup',
+    isaac_sim_config = lu.get_path('vehicle_control_unit',
                                    'config/nvblox/specializations/nvblox_sim.yaml')
-    realsense_config = lu.get_path('nvblox_examples_bringup',
+    realsense_config = lu.get_path('vehicle_control_unit',
                                    'config/nvblox/specializations/nvblox_realsense.yaml')
     multi_realsense_config = lu.get_path(
-        'nvblox_examples_bringup', 'config/nvblox/specializations/nvblox_multi_realsense.yaml')
-    zed_config = lu.get_path('nvblox_examples_bringup',
+        'vehicle_control_unit', 'config/nvblox/specializations/nvblox_multi_realsense.yaml')
+    zed_config = lu.get_path('vehicle_control_unit',
                              'config/nvblox/specializations/nvblox_zed.yaml')
 
     if mode is NvbloxMode.static:
@@ -191,7 +191,7 @@ def generate_launch_description() -> LaunchDescription:
     args.add_arg('mode')
     args.add_arg('camera')
     args.add_arg('num_cameras', 1)
-    args.add_arg('lidar', 'True')      # ← ✅ 0711 Add
+    args.add_arg('lidar', 'False')      # ZED camera does not support lidar
     args.add_arg('container_name', NVBLOX_CONTAINER_NAME)
     args.add_arg('run_standalone', 'False')
 

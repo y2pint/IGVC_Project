@@ -260,12 +260,13 @@ def generate_launch_description() -> LaunchDescription:
 
         # NVBlox perception
         lu.include(
-            'nvblox_examples_bringup',
+            'vehicle_control_unit',
             'launch/perception/nvblox.launch.py',
             launch_arguments={
                 'container_name': NVBLOX_CONTAINER_NAME,
                 'mode': NvbloxMode.static,
                 'camera': args.camera,
+                'lidar': 'False',
             },
         ),
 

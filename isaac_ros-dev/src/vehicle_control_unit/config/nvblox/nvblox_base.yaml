@@ -3,7 +3,7 @@
     # cuda stream setting
     cuda_stream_type: 1  # 0: cuda default stream, 1: blocking async stream, 2: non blocking async stream, 3: per-thread default stream.
     # miscellaneous
-    voxel_size: 0.05
+    voxel_size: 0.10
     num_cameras: 1
     use_tf_transforms: true
     mapping_type: "static_tsdf"  # ["static_tsdf", "static_occupancy"]
@@ -11,15 +11,15 @@
     # Parameters governing frequency of different processing steps in the reconstruction pipeline.
     # Processing happens every n:th tick_period. <=0 means that no processing take place
     tick_period_ms: 10
-    integrate_depth_rate_hz: 40.0
-    integrate_color_rate_hz: 5.0
-    integrate_lidar_rate_hz: 40.0
-    update_mesh_rate_hz: 5.0
-    update_esdf_rate_hz: 10.0
-    publish_layer_rate_hz: 5.0
-    publish_debug_vis_rate_hz: 2.0
-    decay_tsdf_rate_hz: 5.0
-    decay_dynamic_occupancy_rate_hz: 10.0
+    integrate_depth_rate_hz: 15.0       # was 40.0 — ZED depth is 15-30 Hz max anyway
+    integrate_color_rate_hz: 2.0        # was 5.0
+    integrate_lidar_rate_hz: 0.0        # was 40.0 — NO LIDAR CONNECTED, pure waste
+    update_mesh_rate_hz: 1.0            # was 5.0 — mesh only needed for viz
+    update_esdf_rate_hz: 5.0            # was 10.0 — matched to local costmap 5 Hz
+    publish_layer_rate_hz: 1.0          # was 5.0
+    publish_debug_vis_rate_hz: 0.5      # was 2.0
+    decay_tsdf_rate_hz: 2.0             # was 5.0 — static map, slow decay is fine
+    decay_dynamic_occupancy_rate_hz: 0.0  # was 10.0 — unused in static_tsdf mode
     clear_map_outside_radius_rate_hz: 1.0
 
     # printing statistics on console
@@ -37,8 +37,7 @@
     # depth settings
     use_depth: true
     # lidar settings
-    use_lidar: true
-    use_lidar_image: false
+    use_lidar: false                    # was true — no lidar hardware
     lidar_width: 1800
     lidar_height: 31
     lidar_min_valid_range_m: 0.1
@@ -61,7 +60,8 @@
     layer_visualization_exclusion_radius_m: 7.0
     layer_visualization_undo_gamma_correction: false
     max_back_projection_distance: 7.0
-    back_projection_subsampling: 1 # no subsampling if == 1
+    # Depth integration — halves GPU back-projection work
+    back_projection_subsampling: 2      # was 1
     layer_streamer_bandwidth_limit_mbps: -1.0 # unlimited
 
     multi_mapper:
@@ -85,10 +85,10 @@
       occupied_region_half_width_m: 0.1
       # view calculator
       raycast_subsampling_factor: 4
-      workspace_bounds_type: "height_bounds" # ["unbounded", "height_bounds", "bounding_box"]
+      workspace_bounds_type: "unbounded" # ["unbounded", "height_bounds", "bounding_box"]
       workspace_bounds_min_corner_x_m: 0.0
       workspace_bounds_min_corner_y_m: 0.0
-      workspace_bounds_min_height_m: 0.3
+      workspace_bounds_min_height_m: -0.5
       workspace_bounds_max_corner_x_m: 0.0
       workspace_bounds_max_corner_y_m: 0.0
       workspace_bounds_max_height_m: 2.0
